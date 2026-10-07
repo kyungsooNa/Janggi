@@ -827,10 +827,11 @@
         out.push(`<circle class="hint-ring" cx="${x}" cy="${y}" r="44"/>`);
       }
     }
+    // 빈 칸만 점으로 보여 준다. 잡을 수 있는 상대 기물은 스스로 읽도록 표시하지 않는다.
     for (const t of g.targets) {
+      if (g.board[t]) continue;
       const [x, y] = px(t);
-      if (g.board[t]) out.push(`<circle class="target-cap" cx="${x}" cy="${y}" r="${RADIUS[g.board[t][1]] + 8}"/>`);
-      else out.push(`<circle class="target" cx="${x}" cy="${y}" r="15"/>`);
+      out.push(`<circle class="target" cx="${x}" cy="${y}" r="15"/>`);
     }
     $('dyn').innerHTML = out.join('');
 
@@ -845,13 +846,11 @@
     const [x, y] = px(g.selected);
     el.animate([
       { transform: `translate(${x}px,${y}px) scale(1)` },
-      { transform: `translate(${x}px,${y - 9}px) scale(1.08)`, offset: 0.6 },
       { transform: `translate(${x}px,${y - 6}px) scale(1.05)` },
     ], { duration: 80, easing: 'ease-out' });
   }
 
   const reducedMotion = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const shadow = (h) => `drop-shadow(0 ${h.toFixed(1)}px ${(h * 0.7 + 2).toFixed(1)}px rgba(40, 22, 0, ${Math.max(0.22, 0.48 - h * 0.008).toFixed(2)}))`;
 
   /*
    * 기물이 판에서 들려 → 포물선을 그리며 날아가 → "탁" 하고 내려앉는다.
@@ -880,17 +879,16 @@
     const mx = (x1 + x2) / 2;
     const my = (y1 + y2) / 2;
     if (el.animate && !quick) {
+      // 구간을 나누면 구간마다 속도가 줄어 멈칫거린다. 직선 이동 + 가운데서 살짝 떠오르기만 두고,
+      // 가감속은 전체에 한 번만 걸어 출발하자마자 움직이고 끝에서만 부드럽게 멈추게 한다.
       el.animate([
-        { transform: T(x1, y1, 1), filter: shadow(4), easing: 'cubic-bezier(.3,0,.3,1)' },
-        { transform: T(x1, y1 - lift * 0.6, 1.05), filter: shadow(8), offset: 0.14, easing: 'cubic-bezier(.25,.1,.5,1)' },
-        { transform: T(mx, my - lift, 1.08), filter: shadow(11), offset: 0.5, easing: 'cubic-bezier(.5,0,.75,.4)' },
-        { transform: T(x2, y2 - lift * 0.5, 1.05), filter: shadow(8), offset: 0.84, easing: 'cubic-bezier(.6,0,1,1)' },
-        { transform: T(x2, y2 + 1, 0.97), filter: shadow(2), offset: 0.93, easing: 'ease-out' },
-        { transform: T(x2, y2, 1), filter: shadow(4) },
-      ], { duration: dur, fill: 'forwards' });
+        { transform: T(x1, y1, 1) },
+        { transform: T(mx, my - lift, 1.06) },
+        { transform: T(x2, y2, 1) },
+      ], { duration: dur, easing: 'cubic-bezier(.25,.75,.4,1)', fill: 'forwards' });
     }
 
-    const landAt = quick ? 0 : dur * 0.92;
+    const landAt = quick ? 0 : dur * 0.85;
     g.flying.timers.push(setTimeout(() => {
       if (!g.flying || g.flying.token !== token) return;
       playThock(!!captured);

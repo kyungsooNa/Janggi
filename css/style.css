@@ -111,7 +111,8 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   dominant-baseline: central;
   pointer-events: none;
 }
-.board .piece.flying { filter: none; }
+/* 날아가는 동안 그림자를 매 프레임 다시 그리면 폰에서 끊기므로 고정 그림자 하나만 */
+.board .piece.flying { filter: drop-shadow(0 7px 4px rgba(40, 22, 0, 0.4)); will-change: transform; }
 .board .ripple { fill: none; stroke: rgba(255, 246, 214, 0.9); stroke-width: 5; pointer-events: none; }
 .board .glow { animation: glow-in 0.35s ease-out both; }
 @keyframes glow-in { from { opacity: 0; } }
@@ -121,7 +122,6 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   65% { transform: translate(1px, -0.5px); }
 }
 .board .target { fill: rgba(240, 124, 28, 0.78); stroke: #fff6e8; stroke-width: 3; }
-.board .target-cap { fill: none; stroke: var(--accent); stroke-width: 6; stroke-dasharray: 10 7; }
 .board .sel-ring { fill: none; stroke: var(--accent); stroke-width: 5; }
 .board .check-ring { fill: none; stroke: #ff2a2a; stroke-width: 6; animation: pulse 0.9s ease-in-out infinite alternate; }
 .board .hint-ring { fill: none; stroke: #2fbf71; stroke-width: 6; stroke-dasharray: 12 8; }
