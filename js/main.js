@@ -130,6 +130,7 @@
       history: [],
       selected: -1,
       targets: [],
+      repeatTargets: [],
       hint: null,
       started: false,
       over: false,
@@ -154,6 +155,8 @@
     clearInterval(setupTimer);
     closeDialog();
     g.board = buildBoard();
+    g.positions = new Map();
+    countPosition(1);
     g.started = true;
     g.lastTick = performance.now();
     render();
@@ -163,6 +166,24 @@
 
   const isMyTurn = () => g && g.started && !g.over && !g.thinking && g.turn === g.mySide;
 
+  // ───────────── 반복수 ─────────────
+  // 지금 국면(판 + 둘 차례)이 나온 횟수를 더하거나 뺀다
+  function countPosition(delta) {
+    const key = J.positionKey(g.board, g.turn);
+    const n = (g.positions.get(key) || 0) + delta;
+    if (n > 0) g.positions.set(key, n);
+    else g.positions.delete(key);
+  }
+
+  // 반복수로 둘 수 없는 수 목록. 그것까지 빼면 둘 수가 없을 때는 막지 않는다.
+  function forbiddenMoves(side) {
+    const legal = J.legalMoves(g.board, side);
+    const ok = J.nonRepeatingMoves(g.board, side, legal, g.positions);
+    if (ok.length === 0) return [];
+    const okSet = new Set(ok);
+    return legal.filter((m) => !okSet.has(m));
+  }
+
   // ───────────── 수 두기 ─────────────
   function playMove(m) {
     const from = J.moveFrom(m);
@@ -171,12 +192,14 @@
     const captured = J.makeMove(g.board, m);
     g.history.push({ m, piece, captured, side: g.turn, note: J.notation(piece, m) });
     finishTurn();
+    countPosition(1);
     flyPiece(from, to, piece, captured, afterTurn);
   }
 
   function playPass() {
     g.history.push({ pass: true, side: g.turn, note: '한수 쉼' });
     finishTurn();
+    countPosition(1);
     render();
     showToast('한수 쉼', 'small');
     afterTurn();
@@ -188,6 +211,7 @@
     g.turn = J.opponent(g.turn);
     g.selected = -1;
     g.targets = [];
+    g.repeatTargets = [];
     g.hint = null;
   }
 
@@ -229,7 +253,8 @@
     updateButtons();
     const started = Date.now();
     const think = 250 + Math.random() * 450; // 너무 빨리 두면 어색하므로 최소 생각 시간
-    runAI(g.board, g.aiSide, R.aiParams(g.oppRank), (res) => {
+    const params = { ...R.aiParams(g.oppRank), forbidden: forbiddenMoves(g.aiSide) };
+    runAI(g.board, g.aiSide, params, (res) => {
       if (id !== reqSeq || g.over) return;
       const wait = Math.max(0, think - (Date.now() - started));
       setTimeout(() => {
@@ -298,16 +323,24 @@
       playMove(J.makeMoveCode(g.selected, i));
       return;
     }
+    if (g.selected >= 0 && g.repeatTargets.includes(i)) {
+      showToast('반복수라 둘 수 없어요', 'small');
+      return;
+    }
     const p = g.board[i];
     if (p && p[0] === g.mySide && i !== g.selected) {
+      const banned = new Set(forbiddenMoves(g.mySide));
+      const moves = J.legalMovesFrom(g.board, i);
       g.selected = i;
-      g.targets = J.legalMovesFrom(g.board, i).map(J.moveTo);
+      g.targets = moves.filter((m) => !banned.has(m)).map(J.moveTo);
+      g.repeatTargets = moves.filter((m) => banned.has(m)).map(J.moveTo);
       render();
       liftSelected();
       return;
     }
     g.selected = -1;
     g.targets = [];
+    g.repeatTargets = [];
     render();
   }
 
@@ -316,6 +349,10 @@
     if (!isMyTurn()) return;
     if (J.inCheck(g.board, g.mySide)) {
       showToast('장군 중에는 쉴 수 없어요', 'small');
+      return;
+    }
+    if (J.passRepeats(g.board, g.mySide, g.positions)) {
+      showToast('반복수라 쉴 수 없어요', 'small');
       return;
     }
     playPass();
@@ -370,14 +407,17 @@
     reqSeq++;
     g.thinking = false;
     for (;;) {
+      countPosition(-1);
       const h = g.history.pop();
       if (!h.pass) J.unmakeMove(g.board, h.m, h.captured);
+      g.turn = h.side;
       if (h.side === g.mySide) break;
     }
     g.turn = g.mySide;
     g.items.undo--;
     g.selected = -1;
     g.targets = [];
+    g.repeatTargets = [];
     g.hint = null;
     g.checkSide = J.inCheck(g.board, g.mySide) ? g.mySide : null;
     render();
@@ -391,7 +431,7 @@
     updateButtons();
     const id = ++reqSeq;
     showToast('훈수를 찾는 중…', 'small');
-    runAI(g.board, g.mySide, { ...R.aiParams(22), timeMs: 1500, noise: 0, mistakeRate: 0 }, (res) => {
+    runAI(g.board, g.mySide, { ...R.aiParams(22), timeMs: 1500, noise: 0, mistakeRate: 0, forbidden: forbiddenMoves(g.mySide) }, (res) => {
       if (id !== reqSeq || g.over) return;
       g.thinking = false;
       g.hint = res.move;
@@ -640,6 +680,7 @@
       history: [],
       selected: -1,
       targets: [],
+      repeatTargets: [],
       hint: null,
       started: false,
       over: true,

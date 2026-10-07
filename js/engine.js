@@ -326,6 +326,34 @@
     });
   }
 
+  // 국면 식별자: 판 모양 + 둘 차례
+  function positionKey(board, sideToMove) {
+    let k = '';
+    for (let i = 0; i < board.length; i++) k += board[i] || '..';
+    return k + sideToMove;
+  }
+
+  /*
+   * 반복수 금지: 둔 뒤의 국면이 이미 limit 번(기본 2번) 나왔던 수는 뺀다.
+   * 즉 같은 국면을 세 번째로 만드는 수는 둘 수 없다.
+   * counts 는 positionKey → 나온 횟수 Map.
+   */
+  function nonRepeatingMoves(board, side, moves, counts, limit) {
+    const max = limit || 2;
+    const next = opponent(side);
+    return moves.filter((m) => {
+      const cap = makeMove(board, m);
+      const n = counts.get(positionKey(board, next)) || 0;
+      unmakeMove(board, m, cap);
+      return n < max;
+    });
+  }
+
+  // 한수 쉼이 반복수가 되는가
+  function passRepeats(board, side, counts, limit) {
+    return (counts.get(positionKey(board, opponent(side))) || 0) >= (limit || 2);
+  }
+
   // 남은 기물 점수 (한은 덤 포함)
   function materialScore(board, side) {
     let s = side === HAN ? HAN_BONUS : 0;
@@ -386,6 +414,7 @@
     moveFrom, moveTo, makeMoveCode,
     initialBoard, pseudoMoves, legalMoves, legalMovesFrom,
     makeMove, unmakeMove, findKing, inCheck, isAttacked,
+    positionKey, nonRepeatingMoves, passRepeats,
     materialScore, evaluate, notation, squareName,
   };
 

@@ -102,7 +102,13 @@
   function findBestMove(boardIn, side, paramsIn) {
     const params = { ...DEFAULT_PARAMS, ...(paramsIn || {}) };
     const board = boardIn.slice();
-    const rootMoves = J.legalMoves(board, side);
+    let rootMoves = J.legalMoves(board, side);
+    // 반복수로 막힌 수는 빼되, 그러면 둘 수가 없을 때는 그대로 둔다
+    if (params.forbidden && params.forbidden.length) {
+      const banned = new Set(params.forbidden);
+      const allowed = rootMoves.filter((m) => !banned.has(m));
+      if (allowed.length) rootMoves = allowed;
+    }
     if (rootMoves.length === 0) return { move: null, score: 0, depth: 0, nodes: 0 };
     if (rootMoves.length === 1) return { move: rootMoves[0], score: 0, depth: 0, nodes: 0 };
 

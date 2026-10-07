@@ -145,3 +145,47 @@ test('급수: 18급~9단 27단계, 3승 승급 / 3패 강급', () => {
   assert.equal(r.profile.rank, 0); // 18급 아래로는 내려가지 않는다
   assert.ok(R.aiParams(26).depth > R.aiParams(0).depth);
 });
+
+test('반복수: 같은 국면을 세 번째로 만드는 수는 뺀다', () => {
+  const b = boardWith([['cR', 0, 9], ['hR', 8, 0]]);
+  const counts = new Map();
+  const seen = (side) => {
+    const k = J.positionKey(b, side);
+    counts.set(k, (counts.get(k) || 0) + 1);
+  };
+  const up = J.makeMoveCode(sq(0, 9), sq(0, 8));
+  const down = J.makeMoveCode(sq(0, 8), sq(0, 9));
+  const hUp = J.makeMoveCode(sq(8, 0), sq(8, 1));
+  const hDown = J.makeMoveCode(sq(8, 1), sq(8, 0));
+  seen('c');
+  // 차를 두 번 왕복하면 처음 국면(초 차례)이 세 번째로 나오게 된다
+  for (let round = 0; round < 2; round++) {
+    for (const [m, next] of [[up, 'h'], [hUp, 'c'], [down, 'h']]) {
+      J.makeMove(b, m);
+      seen(next);
+    }
+    if (round === 1) break;
+    J.makeMove(b, hDown);
+    seen('c');
+  }
+  // 이제 한이 차를 되돌리면 처음 국면이 세 번째가 된다
+  const hanMoves = J.legalMoves(b, 'h');
+  assert.ok(hanMoves.includes(hDown));
+  const allowed = J.nonRepeatingMoves(b, 'h', hanMoves, counts);
+  assert.ok(!allowed.includes(hDown));
+  assert.equal(allowed.length, hanMoves.length - 1);
+});
+
+test('반복수: 한수 쉼도 반복이면 막힌다', () => {
+  const b = boardWith([]);
+  const counts = new Map([[J.positionKey(b, 'h'), 2]]);
+  assert.ok(J.passRepeats(b, 'c', counts));
+  assert.ok(!J.passRepeats(b, 'c', new Map()));
+});
+
+test('AI는 반복수로 막힌 수를 두지 않는다', () => {
+  const b = boardWith([['cR', 0, 9], ['hR', 0, 3]]);
+  const capture = J.makeMoveCode(sq(0, 9), sq(0, 3));
+  const res = AI.findBestMove(b, 'c', { ...R.aiParams(20), forbidden: [capture] });
+  assert.notEqual(res.move, capture);
+});
