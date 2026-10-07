@@ -19,7 +19,7 @@
   const ITEM_LIMIT = { undo: 3, hint: 3 };
   const STORE_KEY = 'janggi.profile.v1';
 
-  const RADIUS = { K: 46, R: 40, C: 40, H: 40, E: 40, A: 30, P: 30 };
+  const RADIUS = { K: 48, R: 42, C: 42, H: 42, E: 42, A: 31, P: 31 };
   const SETUP_NAMES = Object.keys(J.SETUPS);
   const OPP_NAMES = ['Deplomat', '차포떼고', '궁성지기', '포격수', '외통수', '멍군장군', '초한지', '묘수풀이', '한수위', '졸병일호', '명국사냥꾼', '면상장인'];
 
@@ -737,8 +737,8 @@
   function pieceShape(p, r) {
     const color = p[0] === J.HAN ? 'var(--han)' : 'var(--cho)';
     // 흘림체 글꼴은 글자가 작게 그려져서 조금 키운다
-    const scale = p[0] === J.HAN ? 1 : 1.12;
-    const fs = (p[1] === 'K' ? r * 1.12 : r * 1.22) * scale;
+    const scale = p[0] === J.HAN ? 1 : 1.14;
+    const fs = (p[1] === 'K' ? r * 1.2 : r * 1.36) * scale;
     return `<polygon points="${octagon(r)}" fill="url(#pc-edge)" stroke="#9c9c9c" stroke-width="1.2"/>
       <polygon points="${octagon(r * 0.86)}" fill="url(#pc-face)"/>
       <text class="glyph ${p[0] === J.HAN ? 'han' : 'cho'}" y="${(r * 0.02).toFixed(1)}" font-size="${fs.toFixed(1)}" fill="${color}">${J.HANJA[p[0]][p[1]]}</text>`;
