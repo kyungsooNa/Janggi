@@ -845,11 +845,6 @@
       const [x, y] = px(J.moveTo(last.m));
       out.push(`<circle class="glow" cx="${x}" cy="${y}" r="${RADIUS[last.piece[1]] + 18}" fill="url(#glow)"/>`);
     }
-    if (g.hint !== null && g.hint !== undefined) {
-      const [x1, y1] = px(J.moveFrom(g.hint));
-      const [x2, y2] = px(J.moveTo(g.hint));
-      out.push(`<line class="hint-arrow" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`);
-    }
 
     for (let i = 0; i < 90; i++) {
       const p = g.board[i];
@@ -862,11 +857,23 @@
         + (p[1] === 'K' && g.checkSide === p[0] && live ? `<circle class="check-ring" r="${r + 10}"/>` : '')
         + '</g>');
     }
+    // 훈수 이동선은 기물 위에 그려야 경로에 있는 기물에 가리지 않는다
     if (g.hint !== null && g.hint !== undefined) {
-      for (const i of [J.moveFrom(g.hint), J.moveTo(g.hint)]) {
-        const [x, y] = px(i);
-        out.push(`<circle class="hint-ring" cx="${x}" cy="${y}" r="44"/>`);
-      }
+      const [x1, y1] = px(J.moveFrom(g.hint));
+      const [x2, y2] = px(J.moveTo(g.hint));
+      for (const [x, y] of [[x1, y1], [x2, y2]]) out.push(`<circle class="hint-ring" cx="${x}" cy="${y}" r="44"/>`);
+      const len = Math.hypot(x2 - x1, y2 - y1);
+      const ux = (x2 - x1) / len;
+      const uy = (y2 - y1) / len;
+      // 출발 기물 테두리에서 시작해 도착점 앞에서 화살촉으로 끝낸다
+      const sx = x1 + ux * 30;
+      const sy = y1 + uy * 30;
+      const ex = x2 - ux * 30;
+      const ey = y2 - uy * 30;
+      const hx = ex - ux * 26;
+      const hy = ey - uy * 26;
+      out.push(`<g class="hint-arrow"><line x1="${sx}" y1="${sy}" x2="${hx}" y2="${hy}"/>`
+        + `<polygon points="${ex},${ey} ${hx - uy * 18},${hy + ux * 18} ${hx + uy * 18},${hy - ux * 18}"/></g>`);
     }
     // 빈 칸만 점으로 보여 준다. 잡을 수 있는 상대 기물은 스스로 읽도록 표시하지 않는다.
     for (const t of g.targets) {

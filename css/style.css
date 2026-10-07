@@ -125,7 +125,9 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .board .sel-ring { fill: none; stroke: var(--accent); stroke-width: 5; }
 .board .check-ring { fill: none; stroke: #ff2a2a; stroke-width: 6; animation: pulse 0.9s ease-in-out infinite alternate; }
 .board .hint-ring { fill: none; stroke: #2fbf71; stroke-width: 6; stroke-dasharray: 12 8; }
-.board .hint-arrow { stroke: #2fbf71; stroke-width: 8; stroke-linecap: round; opacity: 0.85; }
+.board .hint-arrow { opacity: 0.9; pointer-events: none; filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.9)); }
+.board .hint-arrow line { stroke: #1f9d5a; stroke-width: 10; stroke-linecap: round; }
+.board .hint-arrow polygon { fill: #1f9d5a; }
 @keyframes pulse { from { opacity: 0.35; } to { opacity: 1; } }
 
 .toast {
