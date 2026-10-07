@@ -237,6 +237,9 @@
       endGame(my > op ? g.mySide : g.aiSide, `${MOVE_LIMIT}수 점수 판정`);
       return;
     }
+    // 수 한도가 다가오면 미리 알려 준다 (장군 알림이 우선)
+    const left = MOVE_LIMIT - g.history.length;
+    if (!check && (left === 20 || left === 10)) showToast(`${MOVE_LIMIT}수까지 ${left}수 남음`, 'small');
     render();
 
     if (legal.length === 0) {
@@ -1050,6 +1053,7 @@
   function renderPanel() {
     const n = g.history.length;
     if (g.replay) $('title').textContent = `기보 재생 ${n} / ${g.replay.rec.moves.length}수`;
+    else if (n >= MOVE_LIMIT - 20) $('title').textContent = `승강급 대국 - ${n} / ${MOVE_LIMIT}수`;
     else $('title').textContent = n > 0 ? `승강급 대국 - ${n}수` : '승강급 대국';
     for (const [id, side] of [['me-side', g.mySide], ['opp-side', g.aiSide]]) {
       $(id).textContent = side === J.CHO ? '楚' : '漢';
