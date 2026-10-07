@@ -875,11 +875,11 @@
       out.push(`<g class="hint-arrow"><line x1="${sx}" y1="${sy}" x2="${hx}" y2="${hy}"/>`
         + `<polygon points="${ex},${ey} ${hx - uy * 18},${hy + ux * 18} ${hx + uy * 18},${hy - ux * 18}"/></g>`);
     }
-    // 빈 칸만 점으로 보여 준다. 잡을 수 있는 상대 기물은 스스로 읽도록 표시하지 않는다.
+    // 갈 수 있는 곳: 빈 칸은 점, 상대 기물이 있는 칸은 그 기물에 테두리
     for (const t of g.targets) {
-      if (g.board[t]) continue;
       const [x, y] = px(t);
-      out.push(`<circle class="target" cx="${x}" cy="${y}" r="15"/>`);
+      if (g.board[t]) out.push(`<polygon class="target-cap" transform="translate(${x} ${y})" points="${octagon(RADIUS[g.board[t][1]] + 4)}"/>`);
+      else out.push(`<circle class="target" cx="${x}" cy="${y}" r="15"/>`);
     }
     $('dyn').innerHTML = out.join('');
 

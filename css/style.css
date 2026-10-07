@@ -122,6 +122,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   65% { transform: translate(1px, -0.5px); }
 }
 .board .target { fill: rgba(240, 124, 28, 0.78); stroke: #fff6e8; stroke-width: 3; }
+.board .target-cap { fill: rgba(240, 124, 28, 0.12); stroke: var(--accent); stroke-width: 5; pointer-events: none; }
 .board .sel-ring { fill: none; stroke: var(--accent); stroke-width: 5; }
 .board .check-ring { fill: none; stroke: #ff2a2a; stroke-width: 6; animation: pulse 0.9s ease-in-out infinite alternate; }
 .board .hint-ring { fill: none; stroke: #2fbf71; stroke-width: 6; stroke-dasharray: 12 8; }
