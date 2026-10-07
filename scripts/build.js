@@ -9,7 +9,7 @@ const fragment = process.argv.includes('--fragment');
 
 const html = read('index.html');
 const app = html.slice(html.indexOf('<!--APP-->'), html.indexOf('<!--/APP-->') + '<!--/APP-->'.length);
-const fonts = html.match(/<link rel="stylesheet" href="https:\/\/fonts[^>]+>/)[0];
+const fonts = html.match(/<link rel="stylesheet" href="https:\/\/fonts[^>]+>/g).join('\n');
 const engine = read('js/engine.js');
 const ai = read('js/ai.js');
 const worker = engine + '\n' + ai + '\n' + read('js/ai-worker.js');

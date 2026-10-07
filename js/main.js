@@ -37,6 +37,22 @@
   function saveProfile() {
     try { localStorage.setItem(STORE_KEY, JSON.stringify(profile)); } catch (e) { /* 무시 */ }
   }
+  const RECORD_KEY = 'janggi.records.v1';
+  const RECORD_MAX = 100;
+  function loadRecords() {
+    try {
+      const r = JSON.parse(localStorage.getItem(RECORD_KEY));
+      if (Array.isArray(r)) return r;
+    } catch (e) { /* 무시 */ }
+    return [];
+  }
+  let records = loadRecords();
+  function saveRecord(rec) {
+    records.unshift(rec);
+    records = records.slice(0, RECORD_MAX);
+    try { localStorage.setItem(RECORD_KEY, JSON.stringify(records)); } catch (e) { /* 무시 */ }
+  }
+
   const stored = loadProfile();
   let profile = stored || { name: '나', rank: 8, points: 0, wins: 0, losses: 0 };
 
@@ -98,7 +114,9 @@
   function newGame() {
     reqSeq++;
     clearInterval(setupTimer);
-    const mySide = Math.random() < 0.5 ? J.CHO : J.HAN;
+    cancelFlight();
+    const pref = profile.sidePref;
+    const mySide = pref === J.CHO || pref === J.HAN ? pref : (Math.random() < 0.5 ? J.CHO : J.HAN);
     const aiSetup = SETUP_NAMES[Math.floor(Math.random() * SETUP_NAMES.length)];
     g = {
       mySide,
@@ -153,9 +171,7 @@
     const captured = J.makeMove(g.board, m);
     g.history.push({ m, piece, captured, side: g.turn, note: J.notation(piece, m) });
     finishTurn();
-    render();
-    animatePiece(from, to);
-    afterTurn();
+    flyPiece(from, to, piece, captured, afterTurn);
   }
 
   function playPass() {
@@ -237,6 +253,19 @@
     if (won) profile.wins = (profile.wins || 0) + 1;
     else profile.losses = (profile.losses || 0) + 1;
     saveProfile();
+    saveRecord({
+      date: Date.now(),
+      mySide: g.mySide,
+      myRank: before,
+      oppName: g.oppName,
+      oppRank: g.oppRank,
+      won,
+      reason,
+      change: res.change,
+      cho: g.mySide === J.CHO ? g.mySetup : g.aiSetup,
+      han: g.mySide === J.HAN ? g.mySetup : g.aiSetup,
+      moves: g.history.map((h) => (h.pass ? -1 : h.m)),
+    });
     render();
     showResultDialog(won, reason, before, res.change);
   }
@@ -273,14 +302,17 @@
     if (p && p[0] === g.mySide && i !== g.selected) {
       g.selected = i;
       g.targets = J.legalMovesFrom(g.board, i).map(J.moveTo);
-    } else {
-      g.selected = -1;
-      g.targets = [];
+      render();
+      liftSelected();
+      return;
     }
+    g.selected = -1;
+    g.targets = [];
     render();
   }
 
   $('btn-pass').addEventListener('click', () => {
+    if (g && g.replay) { replayStep(-1); return; }
     if (!isMyTurn()) return;
     if (J.inCheck(g.board, g.mySide)) {
       showToast('장군 중에는 쉴 수 없어요', 'small');
@@ -290,6 +322,7 @@
   });
 
   $('btn-resign').addEventListener('click', () => {
+    if (g && g.replay) { replayStep(1); return; }
     if (!g || !g.started || g.over) return;
     openDialog(`
       <div class="dlg-body">
@@ -305,6 +338,7 @@
   });
 
   $('btn-items').addEventListener('click', () => {
+    if (g && g.replay) { showRecordsDialog(); return; }
     if (!g || !g.started || g.over) return;
     const canUndo = g.items.undo > 0 && g.history.some((h) => h.side === g.mySide);
     const canHint = g.items.hint > 0 && isMyTurn();
@@ -332,6 +366,7 @@
 
   function undo() {
     if (!g.history.some((h) => h.side === g.mySide)) return;
+    cancelFlight();
     reqSeq++;
     g.thinking = false;
     for (;;) {
@@ -412,17 +447,20 @@
     return J.SETUPS[setup].split('').map((t) => miniPiece(side + t)).join('');
   }
 
-  function showSetupDialog() {
+  function showSetupDialog(keepTimer) {
+    const sideBtn = (side) => `<button type="button" class="side-btn" data-act="side" data-side="${side}" aria-pressed="${g.mySide === side}">
+        <span class="hz ${side === J.CHO ? 'cho' : 'han'}">${side === J.CHO ? '楚' : '漢'}</span>${side === J.CHO ? '초 (먼저)' : '한 (덤 1.5)'}</button>`;
     const oppLabel = g.aiSide === J.HAN ? '한 상차림' : '초 상차림';
     const opts = SETUP_NAMES.map((name) => `
       <button type="button" class="setup-opt" data-act="pick" data-setup="${name}" aria-pressed="${name === g.mySetup}" aria-label="${name}">
         ${setupRow(g.mySide, name)}
       </button>`).join('');
-    const firstNote = g.mySide === J.CHO ? '초(楚)를 잡았습니다. 먼저 둡니다.' : '한(漢)을 잡았습니다. 덤 1.5점을 받고 나중에 둡니다.';
+    const firstNote = g.mySide === J.CHO ? '초(楚)는 먼저 둡니다.' : '한(漢)은 덤 1.5점을 받고 나중에 둡니다.';
     openDialog(`
       ${head('승강급 대국', 'setup-count')}
       <div class="dlg-body">
         <div><h3>상차림 선택</h3><p>대국 시작시 상/마의 위치를 선택합니다. ${firstNote}</p></div>
+        <div class="side-pick"><span class="label">내 진영</span>${sideBtn(J.CHO)}${sideBtn(J.HAN)}</div>
         <div class="setup-opp"><span class="label">${oppLabel}</span><span>${setupRow(g.aiSide, g.aiSetup)}</span></div>
         <div class="setup-grid">${opts}</div>
       </div>
@@ -433,15 +471,25 @@
         g.board = buildBoard();
         render();
       },
+      side: (b) => {
+        if (b.dataset.side === g.mySide) return;
+        g.mySide = b.dataset.side;
+        g.aiSide = J.opponent(g.mySide);
+        g.board = buildBoard();
+        render();
+        showSetupDialog(true);
+      },
       start: startGame,
     });
-    let left = SETUP_SECONDS;
-    $('setup-count').textContent = left;
+    $('setup-count').textContent = g.setupLeft;
+    if (keepTimer) return;
+    g.setupLeft = SETUP_SECONDS;
+    $('setup-count').textContent = g.setupLeft;
     setupTimer = setInterval(() => {
-      left--;
+      g.setupLeft--;
       const el = $('setup-count');
-      if (el) el.textContent = left;
-      if (left <= 0) startGame();
+      if (el) el.textContent = g.setupLeft;
+      if (g.setupLeft <= 0) startGame();
     }, 1000);
   }
 
@@ -476,7 +524,8 @@
       <div class="dlg-foot">
         <button type="button" class="btn-sub" data-act="close">판 보기</button>
         <button type="button" class="btn-main" data-act="again">다시 대국</button>
-      </div>`, { again: newGame });
+      </div>
+      <div class="dlg-foot"><button type="button" class="btn-link" data-act="records">대국 기록 보기</button></div>`, { again: newGame, records: () => showRecordsDialog() });
   }
 
   function showProfileDialog(first) {
@@ -488,15 +537,23 @@
         ${first ? '<p>내 급수를 고르면 같은 급수의 AI와 승강급 대국을 둡니다. 3번 더 이기면 승급, 3번 더 지면 강급합니다.</p>' : ''}
         <div class="field"><label for="pf-name">닉네임</label><input id="pf-name" maxlength="10" value="${escapeHTML(profile.name)}"></div>
         <div class="field"><label for="pf-rank">급수 (18급 ~ 9단)</label><select id="pf-rank">${options}</select></div>
+        <div class="field"><label for="pf-side">내 진영</label><select id="pf-side">
+          <option value="random" ${!profile.sidePref || profile.sidePref === 'random' ? 'selected' : ''}>대국마다 무작위</option>
+          <option value="c" ${profile.sidePref === 'c' ? 'selected' : ''}>항상 초 (楚, 먼저 둠)</option>
+          <option value="h" ${profile.sidePref === 'h' ? 'selected' : ''}>항상 한 (漢, 덤 1.5점)</option>
+        </select></div>
+        <label class="toggle" for="pf-sound">착수 효과음 <input type="checkbox" id="pf-sound" ${profile.sound === false ? '' : 'checked'}></label>
         ${first ? '' : `<div class="record"><div><b>${profile.wins || 0}</b><span>승</span></div><div><b>${profile.losses || 0}</b><span>패</span></div><div><b>${profile.points > 0 ? '+' : ''}${profile.points}</b><span>승급 점수</span></div></div>`}
         ${first ? '' : meterHTML()}
-        ${playing ? '<p>급수를 바꾸면 다음 대국부터 적용됩니다.</p>' : ''}
+        ${first ? '' : '<button type="button" class="btn-sub" data-act="records">대국 기록 보기</button>'}
+        ${playing ? '<p>급수와 진영을 바꾸면 다음 대국부터 적용됩니다.</p>' : ''}
       </div>
       <div class="dlg-foot">
         ${first ? '' : '<button type="button" class="btn-sub" data-act="save">저장</button>'}
         <button type="button" class="btn-main" data-act="newgame">${first ? '대국 시작' : '새 대국'}</button>
       </div>`, {
       save: () => { applyProfileForm(); closeDialog(); render(); },
+      records: () => { applyProfileForm(); showRecordsDialog(); },
       newgame: () => {
         if (playing && !first) {
           applyProfileForm();
@@ -513,12 +570,141 @@
     });
   }
 
+  // ───────────── 대국 기록 · 기보 재생 ─────────────
+  function fmtDate(t) {
+    const d = new Date(t);
+    const two = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}.${two(d.getMonth() + 1)}.${two(d.getDate())} ${two(d.getHours())}:${two(d.getMinutes())}`;
+  }
+
+  function statLine(list) {
+    const w = list.filter((r) => r.won).length;
+    const l = list.length - w;
+    const rate = list.length ? Math.round((w / list.length) * 100) : 0;
+    return { w, l, rate, n: list.length };
+  }
+
+  function showRecordsDialog() {
+    const playing = g && g.started && !g.over && !g.replay;
+    const all = statLine(records);
+    const cho = statLine(records.filter((r) => r.mySide === J.CHO));
+    const han = statLine(records.filter((r) => r.mySide === J.HAN));
+    let streak = 0;
+    for (const r of records) { if (r.won === (records[0] && records[0].won)) streak++; else break; }
+    const streakText = records.length ? `${streak}연${records[0].won ? '승' : '패'}` : '-';
+    const rows = records.map((r, k) => {
+      const side = r.mySide === J.CHO ? '<span class="hz cho">楚</span>' : '<span class="hz han">漢</span>';
+      const change = r.change > 0 ? `<em class="up">▲ ${R.rankName(r.myRank + 1)}</em>` : r.change < 0 ? `<em class="down">▼ ${R.rankName(r.myRank - 1)}</em>` : '';
+      return `<li><button type="button" class="rec" data-act="replay" data-k="${k}" ${playing ? 'disabled' : ''}>
+        <span class="res ${r.won ? 'win' : 'lose'}">${r.won ? '승' : '패'}</span>
+        <span class="mid"><b>${side} vs ${R.rankName(r.oppRank)} ${escapeHTML(r.oppName)}</b>
+          <small>${fmtDate(r.date)} · ${r.reason}${r.won ? '승' : '패'} · ${r.moves.length}수 ${change}</small></span>
+        <span class="go" aria-hidden="true">›</span></button></li>`;
+    }).join('');
+    openDialog(`
+      ${head('대국 기록')}
+      <div class="dlg-body">
+        <div class="record">
+          <div><b>${all.n}</b><span>대국</span></div>
+          <div><b>${all.w}승 ${all.l}패</b><span>승률 ${all.rate}%</span></div>
+          <div><b>${streakText}</b><span>최근 흐름</span></div>
+        </div>
+        <div class="split">
+          <span><span class="hz cho">楚</span> 초로 ${cho.w}승 ${cho.l}패 (${cho.rate}%)</span>
+          <span><span class="hz han">漢</span> 한으로 ${han.w}승 ${han.l}패 (${han.rate}%)</span>
+        </div>
+        <div class="rec-list">${rows ? `<ul>${rows}</ul>` : '<div class="empty">아직 끝낸 대국이 없습니다. 한 판 두면 여기에 쌓입니다.</div>'}</div>
+        ${playing ? '<p>지금 두는 대국이 끝나면 지난 기보를 다시 볼 수 있습니다.</p>' : (rows ? '<p>대국을 누르면 판에서 한 수씩 다시 볼 수 있습니다.</p>' : '')}
+      </div>
+      <div class="dlg-foot">
+        <button type="button" class="btn-sub" data-act="close">닫기</button>
+        ${playing ? '' : '<button type="button" class="btn-main" data-act="again">새 대국</button>'}
+      </div>`, {
+      replay: (b) => enterReplay(records[Number(b.dataset.k)]),
+      again: newGame,
+    });
+  }
+
+  function enterReplay(rec) {
+    if (!rec) return;
+    cancelFlight();
+    reqSeq++;
+    clearInterval(setupTimer);
+    g = {
+      mySide: rec.mySide,
+      aiSide: J.opponent(rec.mySide),
+      oppName: rec.oppName,
+      oppRank: rec.oppRank,
+      board: J.initialBoard(rec.cho, rec.han),
+      turn: J.CHO,
+      history: [],
+      selected: -1,
+      targets: [],
+      hint: null,
+      started: false,
+      over: true,
+      thinking: false,
+      checkSide: null,
+      clocks: { c: freshClock(), h: freshClock() },
+      items: { undo: 0, hint: 0 },
+      replay: { rec, ply: 0 },
+    };
+    closeDialog();
+    render();
+    showToast(`${rec.won ? '승' : '패'} · ${rec.moves.length}수 기보`, 'small');
+  }
+
+  function replayStep(dir) {
+    const rp = g.replay;
+    if (dir > 0) {
+      if (rp.ply >= rp.rec.moves.length) return;
+      const m = rp.rec.moves[rp.ply++];
+      if (m < 0) {
+        g.history.push({ pass: true, side: g.turn, note: '한수 쉼' });
+        g.turn = J.opponent(g.turn);
+        g.checkSide = null;
+        render();
+        showToast('한수 쉼', 'small');
+        return;
+      }
+      const from = J.moveFrom(m);
+      const to = J.moveTo(m);
+      const piece = g.board[from];
+      const captured = J.makeMove(g.board, m);
+      g.history.push({ m, piece, captured, side: g.turn, note: J.notation(piece, m) });
+      g.turn = J.opponent(g.turn);
+      g.checkSide = J.inCheck(g.board, g.turn) ? g.turn : null;
+      flyPiece(from, to, piece, captured, () => {
+        if (rp.ply === rp.rec.moves.length) showToast(`${rp.rec.reason}${rp.rec.won ? '승' : '패'}`, rp.rec.won ? 'block' : 'check');
+        else if (g.checkSide) showToast('장군!', 'check');
+      });
+    } else {
+      if (rp.ply === 0) return;
+      cancelFlight();
+      rp.ply--;
+      const h = g.history.pop();
+      if (!h.pass) J.unmakeMove(g.board, h.m, h.captured);
+      g.turn = h.side;
+      g.checkSide = J.inCheck(g.board, g.turn) ? g.turn : null;
+      render();
+    }
+  }
+
+  // 기보 재생 중 키보드 ← →
+  window.addEventListener('keydown', (e) => {
+    if (!g || !g.replay || !$('overlay').hidden) return;
+    if (e.key === 'ArrowLeft') replayStep(-1);
+    else if (e.key === 'ArrowRight') replayStep(1);
+  });
+
   function applyProfileForm() {
     const name = $('pf-name').value.trim() || '나';
     const rank = parseInt($('pf-rank').value, 10);
     if (rank !== profile.rank) profile.points = 0;
     profile.name = name;
     profile.rank = rank;
+    profile.sidePref = $('pf-side').value;
+    profile.sound = $('pf-sound').checked;
     saveProfile();
   }
 
@@ -550,10 +736,12 @@
 
   function pieceShape(p, r) {
     const color = p[0] === J.HAN ? 'var(--han)' : 'var(--cho)';
-    const fs = p[1] === 'K' ? r * 1.12 : r * 1.22;
+    // 흘림체 글꼴은 글자가 작게 그려져서 조금 키운다
+    const scale = p[0] === J.HAN ? 1 : 1.12;
+    const fs = (p[1] === 'K' ? r * 1.12 : r * 1.22) * scale;
     return `<polygon points="${octagon(r)}" fill="url(#pc-edge)" stroke="#9c9c9c" stroke-width="1.2"/>
       <polygon points="${octagon(r * 0.86)}" fill="url(#pc-face)"/>
-      <text class="glyph" y="${(r * 0.02).toFixed(1)}" font-size="${fs.toFixed(1)}" fill="${color}">${J.HANJA[p[0]][p[1]]}</text>`;
+      <text class="glyph ${p[0] === J.HAN ? 'han' : 'cho'}" y="${(r * 0.02).toFixed(1)}" font-size="${fs.toFixed(1)}" fill="${color}">${J.HANJA[p[0]][p[1]]}</text>`;
   }
 
   function staticLayer() {
@@ -592,23 +780,31 @@
       <g class="grid">${L.join('')}</g>`;
   }
 
-  let staticHTML = null;
+  // 판은 세 겹: 고정(나무·선) / dyn(기물·표시, render 때마다 새로 그림) / fx(날아가는 기물 연출)
+  let layersReady = false;
+  function ensureLayers() {
+    if (layersReady) return;
+    svg.innerHTML = `${staticLayer()}<g id="dyn"></g><g id="fx"></g>`;
+    layersReady = true;
+  }
 
   function render() {
     if (!g) return;
-    if (!staticHTML) staticHTML = staticLayer();
-    const out = [staticHTML];
+    ensureLayers();
+    const out = [];
     const moves = g.history.filter((h) => !h.pass);
     const last = moves[moves.length - 1];
+    const hidden = g.flying ? g.flying.to : -1; // 날아가는 중인 기물은 fx 층에서 그린다
 
     // 직전 두 수(양쪽)의 출발점 ×
     for (const h of moves.slice(-2)) {
       const [x, y] = px(J.moveFrom(h.m));
       out.push(`<path class="xmark" d="M${x - 9} ${y - 9}L${x + 9} ${y + 9}M${x + 9} ${y - 9}L${x - 9} ${y + 9}"/>`);
     }
-    if (last && !g.over) {
+    const live = !g.over || g.replay;
+    if (last && live && !g.flying) {
       const [x, y] = px(J.moveTo(last.m));
-      out.push(`<circle cx="${x}" cy="${y}" r="${RADIUS[last.piece[1]] + 18}" fill="url(#glow)"/>`);
+      out.push(`<circle class="glow" cx="${x}" cy="${y}" r="${RADIUS[last.piece[1]] + 18}" fill="url(#glow)"/>`);
     }
     if (g.hint !== null && g.hint !== undefined) {
       const [x1, y1] = px(J.moveFrom(g.hint));
@@ -618,13 +814,13 @@
 
     for (let i = 0; i < 90; i++) {
       const p = g.board[i];
-      if (!p) continue;
+      if (!p || i === hidden) continue;
       const [x, y] = px(i);
       const r = RADIUS[p[1]];
       const sel = i === g.selected;
-      out.push(`<g class="piece${sel ? ' selected' : ''}" data-i="${i}" style="transform:translate(${x}px,${y - (sel ? 6 : 0)}px)">${pieceShape(p, r)}`
+      out.push(`<g class="piece${sel ? ' selected' : ''}" data-i="${i}" style="transform:translate(${x}px,${y - (sel ? 8 : 0)}px) scale(${sel ? 1.07 : 1})">${pieceShape(p, r)}`
         + (sel ? `<polygon class="sel-ring" points="${octagon(r + 5)}"/>` : '')
-        + (p[1] === 'K' && g.checkSide === p[0] && !g.over ? `<circle class="check-ring" r="${r + 10}"/>` : '')
+        + (p[1] === 'K' && g.checkSide === p[0] && live ? `<circle class="check-ring" r="${r + 10}"/>` : '')
         + '</g>');
     }
     if (g.hint !== null && g.hint !== undefined) {
@@ -638,21 +834,159 @@
       if (g.board[t]) out.push(`<circle class="target-cap" cx="${x}" cy="${y}" r="${RADIUS[g.board[t][1]] + 8}"/>`);
       else out.push(`<circle class="target" cx="${x}" cy="${y}" r="15"/>`);
     }
-    svg.innerHTML = out.join('');
+    $('dyn').innerHTML = out.join('');
 
     renderPanel();
     updateButtons();
   }
 
-  function animatePiece(from, to) {
-    const el = svg.querySelector(`.piece[data-i="${to}"]`);
-    if (!el || !el.animate) return;
+  // 기물을 집을 때 살짝 들어 올리는 연출
+  function liftSelected() {
+    const el = svg.querySelector('.piece.selected');
+    if (!el || !el.animate || reducedMotion()) return;
+    const [x, y] = px(g.selected);
+    el.animate([
+      { transform: `translate(${x}px,${y}px) scale(1)` },
+      { transform: `translate(${x}px,${y - 12}px) scale(1.1)`, offset: 0.6 },
+      { transform: `translate(${x}px,${y - 8}px) scale(1.07)` },
+    ], { duration: 160, easing: 'ease-out' });
+  }
+
+  const reducedMotion = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const shadow = (h) => `drop-shadow(0 ${h.toFixed(1)}px ${(h * 0.7 + 2).toFixed(1)}px rgba(40, 22, 0, ${Math.max(0.22, 0.48 - h * 0.008).toFixed(2)}))`;
+
+  /*
+   * 기물이 판에서 들려 → 포물선을 그리며 날아가 → "탁" 하고 내려앉는다.
+   * 잡힌 기물은 착지 순간 튕겨 나가며 사라진다. onLand 는 착지 직후 호출.
+   */
+  function flyPiece(from, to, piece, captured, onLand) {
+    cancelFlight();
+    const fx = $('fx') || (ensureLayers(), $('fx'));
     const [x1, y1] = px(from);
     const [x2, y2] = px(to);
-    el.animate([
-      { transform: `translate(${x1}px,${y1}px)` },
-      { transform: `translate(${x2}px,${y2}px)` },
-    ], { duration: 220, easing: 'cubic-bezier(.3,.7,.4,1)' });
+    const r = RADIUS[piece[1]];
+    const dist = Math.hypot(x2 - x1, y2 - y1) / S;
+    const quick = reducedMotion();
+    const dur = quick ? 1 : Math.min(760, 360 + dist * 60);
+    const lift = 18 + Math.min(46, dist * 8);
+    const token = {};
+    g.flying = { to, token, timers: [] };
+
+    if (captured) fx.insertAdjacentHTML('beforeend', `<g class="piece victim" style="transform:translate(${x2}px,${y2}px)">${pieceShape(captured, RADIUS[captured[1]])}</g>`);
+    fx.insertAdjacentHTML('beforeend', `<g class="piece flying" style="transform:translate(${x1}px,${y1}px)">${pieceShape(piece, r)}</g>`);
+    const victim = fx.querySelector('.victim');
+    const el = fx.querySelector('.flying');
+    render();
+
+    const T = (x, y, k) => `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) scale(${k})`;
+    const mx = (x1 + x2) / 2;
+    const my = (y1 + y2) / 2;
+    if (el.animate && !quick) {
+      el.animate([
+        { transform: T(x1, y1, 1), filter: shadow(4), easing: 'cubic-bezier(.3,0,.3,1)' },
+        { transform: T(x1, y1 - lift * 0.55, 1.15), filter: shadow(16), offset: 0.16, easing: 'cubic-bezier(.25,.1,.5,1)' },
+        { transform: T(mx, my - lift, 1.22), filter: shadow(26), offset: 0.5, easing: 'cubic-bezier(.5,0,.75,.4)' },
+        { transform: T(x2, y2 - lift * 0.45, 1.14), filter: shadow(14), offset: 0.82, easing: 'cubic-bezier(.6,0,1,1)' },
+        { transform: T(x2, y2 + 2, 0.94), filter: shadow(1), offset: 0.92, easing: 'ease-out' },
+        { transform: T(x2, y2, 1), filter: shadow(4) },
+      ], { duration: dur, fill: 'forwards' });
+    }
+
+    const landAt = quick ? 0 : dur * 0.9;
+    g.flying.timers.push(setTimeout(() => {
+      if (!g.flying || g.flying.token !== token) return;
+      playThock(!!captured);
+      if (!quick) {
+        fx.insertAdjacentHTML('afterbegin', `<circle class="ripple" cx="${x2}" cy="${y2}" r="${r}"/>`);
+        const ripple = fx.querySelector('.ripple');
+        if (ripple.animate) {
+          ripple.animate([{ r: r, opacity: 0.85, strokeWidth: 6 }, { r: r + 34, opacity: 0, strokeWidth: 1 }], { duration: 420, easing: 'ease-out', fill: 'forwards' });
+        }
+      }
+      if (victim) {
+        const dirX = Math.sign(x2 - x1) || (Math.random() < 0.5 ? -1 : 1);
+        const dirY = Math.sign(y2 - y1) || -1;
+        if (victim.animate && !quick) {
+          victim.animate([
+            { transform: `translate(${x2}px,${y2}px) scale(1) rotate(0deg)`, opacity: 1 },
+            { transform: `translate(${x2 + dirX * 46}px,${y2 + dirY * 30 - 26}px) scale(1.18) rotate(${dirX * 28}deg)`, opacity: 0.9, offset: 0.4 },
+            { transform: `translate(${x2 + dirX * 80}px,${y2 + dirY * 50 + 10}px) scale(0.7) rotate(${dirX * 70}deg)`, opacity: 0 },
+          ], { duration: 460, easing: 'cubic-bezier(.2,.6,.4,1)', fill: 'forwards' });
+        } else {
+          victim.remove();
+        }
+        const wrap = svg.parentElement;
+        wrap.classList.remove('shake');
+        void wrap.offsetWidth;
+        if (!quick) wrap.classList.add('shake');
+      }
+    }, landAt));
+
+    g.flying.timers.push(setTimeout(() => {
+      if (!g.flying || g.flying.token !== token) return;
+      g.flying = null;
+      if (el) el.remove();
+      render();
+      if (onLand) onLand();
+      // 튕겨 나간 기물과 물결은 마저 사라진 뒤 치운다
+      setTimeout(() => { if (!g.flying) fx.innerHTML = ''; }, 500);
+    }, dur));
+  }
+
+  function cancelFlight() {
+    if (g && g.flying) {
+      g.flying.timers.forEach(clearTimeout);
+      g.flying = null;
+    }
+    const fx = $('fx');
+    if (fx) fx.innerHTML = '';
+  }
+
+  // ───────────── 효과음 ("탁") ─────────────
+  let actx = null;
+  function audio() {
+    if (profile.sound === false) return null;
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === 'suspended') actx.resume();
+    } catch (e) {
+      return null;
+    }
+    return actx;
+  }
+  // 브라우저는 사용자가 한 번 누른 뒤에야 소리를 허락한다
+  window.addEventListener('pointerdown', () => audio(), { once: true });
+
+  function playThock(heavy) {
+    const a = audio();
+    if (!a || a.state !== 'running') return;
+    const t = a.currentTime;
+    // 나무끼리 부딪치는 짧은 소리
+    const len = Math.floor(a.sampleRate * 0.07);
+    const buf = a.createBuffer(1, len, a.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 5);
+    const src = a.createBufferSource();
+    src.buffer = buf;
+    const bp = a.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = heavy ? 1250 : 1900;
+    bp.Q.value = 1.4;
+    const ng = a.createGain();
+    ng.gain.value = heavy ? 1.1 : 0.75;
+    src.connect(bp).connect(ng).connect(a.destination);
+    src.start(t);
+    // 판이 울리는 낮은 소리
+    const o = a.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(heavy ? 170 : 240, t);
+    o.frequency.exponentialRampToValueAtTime(80, t + 0.1);
+    const og = a.createGain();
+    og.gain.setValueAtTime(heavy ? 0.55 : 0.32, t);
+    og.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+    o.connect(og).connect(a.destination);
+    o.start(t);
+    o.stop(t + 0.15);
   }
 
   function fmt(sec) {
@@ -662,16 +996,19 @@
 
   function renderPanel() {
     const n = g.history.length;
-    $('title').textContent = n > 0 ? `승강급 대국 - ${n}수` : '승강급 대국';
-    $('me-side').textContent = g.mySide === J.CHO ? '楚' : '漢';
-    $('opp-side').textContent = g.aiSide === J.CHO ? '楚' : '漢';
+    if (g.replay) $('title').textContent = `기보 재생 ${n} / ${g.replay.rec.moves.length}수`;
+    else $('title').textContent = n > 0 ? `승강급 대국 - ${n}수` : '승강급 대국';
+    for (const [id, side] of [['me-side', g.mySide], ['opp-side', g.aiSide]]) {
+      $(id).textContent = side === J.CHO ? '楚' : '漢';
+      $(id).className = `side-mark ${side === J.CHO ? 'cho' : 'han'}`;
+    }
     $('me-score').textContent = `${J.materialScore(g.board, g.mySide).toFixed(1)}점`;
     $('opp-score').textContent = `${J.materialScore(g.board, g.aiSide).toFixed(1)}점`;
-    $('me-rank').textContent = R.rankName(profile.rank);
+    $('me-rank').textContent = R.rankName(g.replay ? g.replay.rec.myRank : profile.rank);
     $('me-name').textContent = profile.name;
     $('opp-rank').textContent = R.rankName(g.oppRank);
     $('opp-name').textContent = g.oppName;
-    const active = g.started && !g.over;
+    const active = (g.started && !g.over) || !!g.replay;
     $('player-me').classList.toggle('active', active && g.turn === g.mySide);
     $('player-opp').classList.toggle('active', active && g.turn === g.aiSide);
     const bar = document.querySelector('.turnbar');
@@ -690,6 +1027,14 @@
   }
 
   function updateButtons() {
+    const labels = g && g.replay ? ['◀ 이전', '다음 ▶', '기록 목록'] : ['한수 쉼', '기 권', '아이템'];
+    ['btn-pass', 'btn-resign', 'btn-items'].forEach((id, k) => { $(id).textContent = labels[k]; });
+    if (g && g.replay) {
+      $('btn-pass').disabled = g.replay.ply === 0;
+      $('btn-resign').disabled = g.replay.ply >= g.replay.rec.moves.length;
+      $('btn-items').disabled = false;
+      return;
+    }
     const mine = isMyTurn();
     $('btn-pass').disabled = !mine;
     $('btn-resign').disabled = !g || !g.started || g.over;

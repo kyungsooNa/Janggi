@@ -17,7 +17,8 @@
   --card-sub: #6c6c70;
   --card-sel: #dcdcde;
   --font-ui: 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
-  --font-glyph: 'Noto Serif KR', 'Batang', 'AppleMyungjo', serif;
+  --font-glyph: 'Noto Serif KR', 'Batang', 'AppleMyungjo', serif;          /* 한: 정자체 */
+  --font-cursive: 'Zhi Mang Xing', 'Noto Serif KR', 'Batang', serif;       /* 초: 흘림체 */
   color-scheme: dark;
 }
 
@@ -111,6 +112,16 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   dominant-baseline: central;
   pointer-events: none;
 }
+.board .piece.flying { filter: none; }
+.board .ripple { fill: none; stroke: rgba(255, 246, 214, 0.9); stroke-width: 5; pointer-events: none; }
+.board .glow { animation: glow-in 0.35s ease-out both; }
+@keyframes glow-in { from { opacity: 0; } }
+.board-wrap.shake .board { animation: shake 0.26s ease-out; }
+@keyframes shake {
+  20% { transform: translate(-3px, 2px); }
+  45% { transform: translate(3px, -1px); }
+  70% { transform: translate(-1px, 1px); }
+}
 .board .target { fill: rgba(240, 124, 28, 0.78); stroke: #fff6e8; stroke-width: 3; }
 .board .target-cap { fill: none; stroke: var(--accent); stroke-width: 6; stroke-dasharray: 10 7; }
 .board .sel-ring { fill: none; stroke: var(--accent); stroke-width: 5; }
@@ -186,6 +197,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .avatar.ai svg { fill: #5f6470; stroke: #5f6470; stroke-width: 2.4; stroke-linecap: round; }
 .avatar.ai svg .eye { fill: #e6e2da; stroke: none; }
 .side-mark { font-family: var(--font-glyph); font-weight: 900; font-size: clamp(28px, 8vw, 38px); color: #59595d; }
+.side-mark.cho { font-family: var(--font-cursive); font-weight: 400; font-size: clamp(34px, 9.6vw, 46px); line-height: 1; }
 .player .info-row { font-size: clamp(12.5px, 3.6vw, 16px); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #6b6b70; }
 .player.opp .info-row { text-align: right; }
 .player .score { font-variant-numeric: tabular-nums; }
@@ -287,6 +299,21 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .setup-opt[aria-pressed="true"] { background: var(--card-sel); box-shadow: inset 0 0 0 2px #b9b9bd; }
 .mini { width: clamp(32px, 9vw, 42px); height: auto; aspect-ratio: 1; max-width: 100%; filter: drop-shadow(0 2px 1px rgba(0, 0, 0, 0.3)); }
 .mini .glyph { font-family: var(--font-glyph); font-weight: 900; text-anchor: middle; dominant-baseline: central; }
+.glyph.cho { font-family: var(--font-cursive); font-weight: 400; stroke: var(--cho); stroke-width: 1.4; paint-order: stroke; }
+
+.side-pick { display: grid; grid-template-columns: auto 1fr 1fr; align-items: center; gap: 8px; }
+.side-pick .label { font-size: 16px; font-weight: 900; color: #444; margin-right: 4px; }
+.side-btn {
+  height: 46px; border: 0; border-radius: 12px; background: #fff; color: #555;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); font-size: 16px; font-weight: 700; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.side-btn .hz { font-family: var(--font-glyph); font-weight: 900; font-size: 22px; }
+.side-btn .hz.cho { font-family: var(--font-cursive); font-weight: 400; font-size: 26px; color: var(--cho); }
+.side-btn .hz.han { color: var(--han); }
+.side-btn[aria-pressed="true"] { background: var(--card-sel); box-shadow: inset 0 0 0 2px #b9b9bd; color: #222; }
+.toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 15px; font-weight: 700; color: #555; }
+.toggle input { width: 22px; height: 22px; accent-color: #e5772a; }
 
 .result-title { font-size: 46px; font-weight: 900; text-align: center; margin: 4px 0 0; letter-spacing: 0.06em; }
 .result-title.win { color: #e5772a; }
@@ -339,3 +366,32 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* ── 대국 기록 ── */
+.btn-link { height: 36px; border: 0; background: none; color: #6c6c70; font-size: 15px; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.dlg-body > .btn-sub { height: 46px; font-size: 16px; }
+.hz { font-family: var(--font-glyph); font-weight: 900; }
+.hz.cho { font-family: var(--font-cursive); font-weight: 400; color: var(--cho); font-size: 1.15em; }
+.hz.han { color: var(--han); }
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13.5px; font-weight: 700; color: #555; font-variant-numeric: tabular-nums; }
+.split > span { background: #fff; border-radius: 10px; padding: 8px 10px; display: flex; align-items: center; gap: 6px; }
+.rec-list { max-height: 42vh; overflow: auto; border-radius: 12px; background: #fff; }
+.rec-list ul { list-style: none; margin: 0; padding: 4px; display: grid; gap: 2px; }
+.rec-list .empty { padding: 18px; text-align: center; color: var(--card-sub); font-size: 14px; }
+.rec {
+  width: 100%; display: grid; grid-template-columns: 40px 1fr auto; align-items: center; gap: 10px;
+  padding: 8px 8px; border: 0; border-radius: 10px; background: transparent; color: #333; text-align: left; cursor: pointer;
+}
+.rec:hover:not(:disabled) { background: #f3f3f4; }
+.rec:disabled { cursor: default; }
+.rec .res { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-weight: 900; font-size: 17px; color: #fff; }
+.rec .res.win { background: #e5772a; }
+.rec .res.lose { background: #7a8090; }
+.rec .mid { min-width: 0; display: grid; gap: 2px; }
+.rec .mid b { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rec .mid small { font-size: 12.5px; color: var(--card-sub); font-variant-numeric: tabular-nums; }
+.rec .mid em { font-style: normal; font-weight: 700; }
+.rec .mid em.up { color: #e5772a; }
+.rec .mid em.down { color: #5b6170; }
+.rec .go { font-size: 24px; color: #b5b5b9; }
+.rec:disabled .go { visibility: hidden; }
