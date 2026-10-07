@@ -783,6 +783,16 @@
       <text class="glyph ${p[0] === J.HAN ? 'han' : 'cho'}" y="${(r * 0.02).toFixed(1)}" font-size="${fs.toFixed(1)}" fill="${color}">${J.HANJA[p[0]][p[1]]}</text>`;
   }
 
+  // 중심 (x, y), 반폭 h, 꺾임 길이 a 인 네 모서리 괄호
+  function brackets(x, y, h, a) {
+    const c = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
+    return c.map(([sx, sy]) => {
+      const cx = x + sx * h;
+      const cy = y + sy * h;
+      return `M${cx - sx * a} ${cy}L${cx} ${cy}L${cx} ${cy - sy * a}`;
+    }).join('');
+  }
+
   function staticLayer() {
     const L = [];
     const X = (x) => M + x * S;
@@ -853,7 +863,7 @@
       const r = RADIUS[p[1]];
       const sel = i === g.selected;
       out.push(`<g class="piece${sel ? ' selected' : ''}" data-i="${i}" style="transform:translate(${x}px,${y - (sel ? 6 : 0)}px) scale(${sel ? 1.05 : 1})">${pieceShape(p, r)}`
-        + (sel ? `<polygon class="sel-ring" points="${octagon(r + 5)}"/>` : '')
+        + (sel ? `<polygon class="sel-ring" points="${octagon(r + 1)}"/>` : '')
         + (p[1] === 'K' && g.checkSide === p[0] && live ? `<circle class="check-ring" r="${r + 10}"/>` : '')
         + '</g>');
     }
@@ -875,11 +885,10 @@
       out.push(`<g class="hint-arrow"><line x1="${sx}" y1="${sy}" x2="${hx}" y2="${hy}"/>`
         + `<polygon points="${ex},${ey} ${hx - uy * 18},${hy + ux * 18} ${hx + uy * 18},${hy - ux * 18}"/></g>`);
     }
-    // 갈 수 있는 곳: 빈 칸은 점, 상대 기물이 있는 칸은 그 기물에 테두리
+    // 갈 수 있는 곳: 빈 칸이든 상대 기물이 있든 모서리 괄호 [ ] 를 기물 위에 그린다
     for (const t of g.targets) {
       const [x, y] = px(t);
-      if (g.board[t]) out.push(`<polygon class="target-cap" transform="translate(${x} ${y})" points="${octagon(RADIUS[g.board[t][1]] + 4)}"/>`);
-      else out.push(`<circle class="target" cx="${x}" cy="${y}" r="15"/>`);
+      out.push(`<path class="target" d="${brackets(x, y, 22, 9)}"/>`);
     }
     $('dyn').innerHTML = out.join('');
 
