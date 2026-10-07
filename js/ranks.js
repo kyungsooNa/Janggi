@@ -25,19 +25,26 @@
    *   mistakeMargin: 실수할 때 최선 수 대비 허용하는 점수 손해
    *   quiesce      : 정지 탐색 깊이 (0이면 수읽기 끝에서 맞교환을 보지 못한다)
    */
+  // 급수별 최대 탐색 깊이 (18급 → 9단). 단 구간은 한 단계마다 한 수씩 더 깊이 읽게 나눴다.
+  const DEPTH = [
+    1, 1, 1, 1, //  18급 ~ 15급
+    2, 2, 2, 2, 2, // 14급 ~ 10급
+    3, 3, 3, 3, 3, //  9급 ~ 5급
+    4, 4, 4, 4, //  4급 ~ 1급
+    5, 5, 5, //  1단 ~ 3단
+    6, 6, 6, //  4단 ~ 6단
+    7, 7, //  7단 ~ 8단
+    8, //  9단
+  ];
+
   function aiParams(index) {
     const s = Math.max(0, Math.min(RANKS.length - 1, index)); // 0 = 18급, 26 = 9단
-    let depth;
-    if (s < 4) depth = 1;
-    else if (s < 9) depth = 2;
-    else if (s < 15) depth = 3;
-    else if (s < 21) depth = 4;
-    else depth = 6;
     return {
-      depth,
-      timeMs: Math.round(250 + s * 140),
-      noise: Math.max(0, 3.2 - s * 0.16),
-      mistakeRate: Math.max(0, 0.4 - s * 0.022),
+      depth: DEPTH[s],
+      timeMs: Math.round(300 + s * 180),
+      // 급 구간은 일부러 흔들리고 실수하며, 1~3단은 가끔만 실수하고, 4단부터는 실수하지 않는다
+      noise: s < 18 ? Math.max(0, 3.2 - s * 0.18) : 0,
+      mistakeRate: s < 21 ? Math.max(0, 0.4 - s * 0.019) : 0,
       mistakeMargin: Math.max(0.5, 7 - s * 0.3),
       quiesce: s < 2 ? 0 : s < 6 ? 2 : s < 12 ? 4 : 6,
     };
