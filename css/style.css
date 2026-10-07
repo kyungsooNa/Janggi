@@ -103,7 +103,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .board .grid .frame { stroke-width: 3; }
 .board .xmark { stroke: #2a1d0c; stroke-width: 2.4; stroke-linecap: round; }
 .board .piece { filter: drop-shadow(0 4px 2.5px rgba(40, 22, 0, 0.42)); }
-.board .piece.selected { filter: drop-shadow(0 10px 6px rgba(40, 22, 0, 0.45)); }
+.board .piece.selected { filter: drop-shadow(0 7px 4px rgba(40, 22, 0, 0.45)); }
 .board .glyph {
   font-family: var(--font-glyph);
   font-weight: 800;
@@ -115,11 +115,10 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .board .ripple { fill: none; stroke: rgba(255, 246, 214, 0.9); stroke-width: 5; pointer-events: none; }
 .board .glow { animation: glow-in 0.35s ease-out both; }
 @keyframes glow-in { from { opacity: 0; } }
-.board-wrap.shake .board { animation: shake 0.26s ease-out; }
+.board-wrap.shake .board { animation: shake 0.16s ease-out; }
 @keyframes shake {
-  20% { transform: translate(-3px, 2px); }
-  45% { transform: translate(3px, -1px); }
-  70% { transform: translate(-1px, 1px); }
+  30% { transform: translate(-1.5px, 1px); }
+  65% { transform: translate(1px, -0.5px); }
 }
 .board .target { fill: rgba(240, 124, 28, 0.78); stroke: #fff6e8; stroke-width: 3; }
 .board .target-cap { fill: none; stroke: var(--accent); stroke-width: 6; stroke-dasharray: 10 7; }

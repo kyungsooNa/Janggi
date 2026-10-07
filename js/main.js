@@ -816,7 +816,7 @@
       const [x, y] = px(i);
       const r = RADIUS[p[1]];
       const sel = i === g.selected;
-      out.push(`<g class="piece${sel ? ' selected' : ''}" data-i="${i}" style="transform:translate(${x}px,${y - (sel ? 8 : 0)}px) scale(${sel ? 1.07 : 1})">${pieceShape(p, r)}`
+      out.push(`<g class="piece${sel ? ' selected' : ''}" data-i="${i}" style="transform:translate(${x}px,${y - (sel ? 6 : 0)}px) scale(${sel ? 1.05 : 1})">${pieceShape(p, r)}`
         + (sel ? `<polygon class="sel-ring" points="${octagon(r + 5)}"/>` : '')
         + (p[1] === 'K' && g.checkSide === p[0] && live ? `<circle class="check-ring" r="${r + 10}"/>` : '')
         + '</g>');
@@ -845,9 +845,9 @@
     const [x, y] = px(g.selected);
     el.animate([
       { transform: `translate(${x}px,${y}px) scale(1)` },
-      { transform: `translate(${x}px,${y - 12}px) scale(1.1)`, offset: 0.6 },
-      { transform: `translate(${x}px,${y - 8}px) scale(1.07)` },
-    ], { duration: 160, easing: 'ease-out' });
+      { transform: `translate(${x}px,${y - 9}px) scale(1.08)`, offset: 0.6 },
+      { transform: `translate(${x}px,${y - 6}px) scale(1.05)` },
+    ], { duration: 110, easing: 'ease-out' });
   }
 
   const reducedMotion = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -865,8 +865,8 @@
     const r = RADIUS[piece[1]];
     const dist = Math.hypot(x2 - x1, y2 - y1) / S;
     const quick = reducedMotion();
-    const dur = quick ? 1 : Math.min(760, 360 + dist * 60);
-    const lift = 18 + Math.min(46, dist * 8);
+    const dur = quick ? 1 : Math.min(360, 190 + dist * 22);
+    const lift = 6 + Math.min(12, dist * 2);
     const token = {};
     g.flying = { to, token, timers: [] };
 
@@ -882,15 +882,15 @@
     if (el.animate && !quick) {
       el.animate([
         { transform: T(x1, y1, 1), filter: shadow(4), easing: 'cubic-bezier(.3,0,.3,1)' },
-        { transform: T(x1, y1 - lift * 0.55, 1.15), filter: shadow(16), offset: 0.16, easing: 'cubic-bezier(.25,.1,.5,1)' },
-        { transform: T(mx, my - lift, 1.22), filter: shadow(26), offset: 0.5, easing: 'cubic-bezier(.5,0,.75,.4)' },
-        { transform: T(x2, y2 - lift * 0.45, 1.14), filter: shadow(14), offset: 0.82, easing: 'cubic-bezier(.6,0,1,1)' },
-        { transform: T(x2, y2 + 2, 0.94), filter: shadow(1), offset: 0.92, easing: 'ease-out' },
+        { transform: T(x1, y1 - lift * 0.6, 1.05), filter: shadow(8), offset: 0.14, easing: 'cubic-bezier(.25,.1,.5,1)' },
+        { transform: T(mx, my - lift, 1.08), filter: shadow(11), offset: 0.5, easing: 'cubic-bezier(.5,0,.75,.4)' },
+        { transform: T(x2, y2 - lift * 0.5, 1.05), filter: shadow(8), offset: 0.84, easing: 'cubic-bezier(.6,0,1,1)' },
+        { transform: T(x2, y2 + 1, 0.97), filter: shadow(2), offset: 0.93, easing: 'ease-out' },
         { transform: T(x2, y2, 1), filter: shadow(4) },
       ], { duration: dur, fill: 'forwards' });
     }
 
-    const landAt = quick ? 0 : dur * 0.9;
+    const landAt = quick ? 0 : dur * 0.92;
     g.flying.timers.push(setTimeout(() => {
       if (!g.flying || g.flying.token !== token) return;
       playThock(!!captured);
@@ -898,7 +898,7 @@
         fx.insertAdjacentHTML('afterbegin', `<circle class="ripple" cx="${x2}" cy="${y2}" r="${r}"/>`);
         const ripple = fx.querySelector('.ripple');
         if (ripple.animate) {
-          ripple.animate([{ r: r, opacity: 0.85, strokeWidth: 6 }, { r: r + 34, opacity: 0, strokeWidth: 1 }], { duration: 420, easing: 'ease-out', fill: 'forwards' });
+          ripple.animate([{ r: r, opacity: 0.85, strokeWidth: 6 }, { r: r + 20, opacity: 0, strokeWidth: 1 }], { duration: 300, easing: 'ease-out', fill: 'forwards' });
         }
       }
       if (victim) {
@@ -907,9 +907,9 @@
         if (victim.animate && !quick) {
           victim.animate([
             { transform: `translate(${x2}px,${y2}px) scale(1) rotate(0deg)`, opacity: 1 },
-            { transform: `translate(${x2 + dirX * 46}px,${y2 + dirY * 30 - 26}px) scale(1.18) rotate(${dirX * 28}deg)`, opacity: 0.9, offset: 0.4 },
-            { transform: `translate(${x2 + dirX * 80}px,${y2 + dirY * 50 + 10}px) scale(0.7) rotate(${dirX * 70}deg)`, opacity: 0 },
-          ], { duration: 460, easing: 'cubic-bezier(.2,.6,.4,1)', fill: 'forwards' });
+            { transform: `translate(${x2 + dirX * 28}px,${y2 + dirY * 18 - 14}px) scale(1.08) rotate(${dirX * 20}deg)`, opacity: 0.85, offset: 0.4 },
+            { transform: `translate(${x2 + dirX * 50}px,${y2 + dirY * 30 + 6}px) scale(0.75) rotate(${dirX * 45}deg)`, opacity: 0 },
+          ], { duration: 300, easing: 'cubic-bezier(.2,.6,.4,1)', fill: 'forwards' });
         } else {
           victim.remove();
         }
@@ -927,7 +927,7 @@
       render();
       if (onLand) onLand();
       // 튕겨 나간 기물과 물결은 마저 사라진 뒤 치운다
-      setTimeout(() => { if (!g.flying) fx.innerHTML = ''; }, 500);
+      setTimeout(() => { if (!g.flying) fx.innerHTML = ''; }, 320);
     }, dur));
   }
 
