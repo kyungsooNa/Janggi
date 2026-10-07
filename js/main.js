@@ -736,9 +736,7 @@
 
   function pieceShape(p, r) {
     const color = p[0] === J.HAN ? 'var(--han)' : 'var(--cho)';
-    // 흘림체 글꼴은 글자가 작게 그려져서 조금 키운다
-    const scale = p[0] === J.HAN ? 1 : 1.14;
-    const fs = (p[1] === 'K' ? r * 1.2 : r * 1.36) * scale;
+    const fs = p[1] === 'K' ? r * 1.16 : r * 1.3;
     return `<polygon points="${octagon(r)}" fill="url(#pc-edge)" stroke="#9c9c9c" stroke-width="1.2"/>
       <polygon points="${octagon(r * 0.86)}" fill="url(#pc-face)"/>
       <text class="glyph ${p[0] === J.HAN ? 'han' : 'cho'}" y="${(r * 0.02).toFixed(1)}" font-size="${fs.toFixed(1)}" fill="${color}">${J.HANJA[p[0]][p[1]]}</text>`;
