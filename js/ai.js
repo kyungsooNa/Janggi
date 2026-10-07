@@ -1,6 +1,7 @@
 /*
  * 장기 AI: 알파-베타 네가맥스 + 정지 탐색 + 반복 심화
  * 탐색 내부에서는 의사 합법수를 쓰고, 궁을 잡는 수가 있으면 즉시 승리로 본다.
+ * 실력은 JanggiRanks.aiParams() 가 돌려주는 값으로 조절한다.
  */
 (function (global) {
   'use strict';
@@ -8,12 +9,9 @@
   const J = global.Janggi || (typeof require !== 'undefined' ? require('./engine.js') : null);
 
   const MATE = 100000;
-  const QUIESCE_MAX = 6;
 
-  const LEVELS = {
-    easy: { depth: 1, timeMs: 400, noise: 2.5 },
-    normal: { depth: 3, timeMs: 1500, noise: 0.3 },
-    hard: { depth: 5, timeMs: 3500, noise: 0 },
+  const DEFAULT_PARAMS = {
+    depth: 3, timeMs: 1500, noise: 0, mistakeRate: 0, mistakeMargin: 0, quiesce: 6,
   };
 
   class Timeout extends Error {}
@@ -39,7 +37,15 @@
     return keyed.map((o) => o.m);
   }
 
-  function createSearch(deadline) {
+  function hasKingCapture(board, moves) {
+    for (let i = 0; i < moves.length; i++) {
+      const v = board[J.moveTo(moves[i])];
+      if (v && v[1] === 'K') return true;
+    }
+    return false;
+  }
+
+  function createSearch(deadline, quiesceDepth) {
     let nodes = 0;
 
     function tick() {
@@ -49,14 +55,10 @@
     function quiesce(board, side, alpha, beta, qdepth, ply) {
       tick();
       const moves = J.pseudoMoves(board, side);
-      for (const m of moves) {
-        const v = board[J.moveTo(m)];
-        if (v && v[1] === 'K') return MATE - ply;
-      }
+      if (hasKingCapture(board, moves)) return MATE - ply;
       const standPat = scoreFor(board, side);
-      if (standPat >= beta) return standPat;
+      if (standPat >= beta || qdepth <= 0) return standPat;
       if (standPat > alpha) alpha = standPat;
-      if (qdepth <= 0) return standPat;
 
       const captures = orderMoves(board, moves.filter((m) => board[J.moveTo(m)]));
       for (const m of captures) {
@@ -70,13 +72,10 @@
     }
 
     function negamax(board, side, depth, alpha, beta, ply) {
-      if (depth <= 0) return quiesce(board, side, alpha, beta, QUIESCE_MAX, ply);
+      if (depth <= 0) return quiesce(board, side, alpha, beta, quiesceDepth, ply);
       tick();
       const moves = J.pseudoMoves(board, side);
-      for (const m of moves) {
-        const v = board[J.moveTo(m)];
-        if (v && v[1] === 'K') return MATE - ply;
-      }
+      if (hasKingCapture(board, moves)) return MATE - ply;
       let best = -Infinity;
       for (const m of orderMoves(board, moves)) {
         const cap = J.makeMove(board, m);
@@ -97,26 +96,29 @@
   }
 
   /**
-   * 가장 좋은 수를 찾는다. 둘 수 있는 합법수가 없으면 null (한수 쉼).
+   * 가장 좋은 수를 찾는다. 둘 수 있는 합법수가 없으면 move 는 null (한수 쉼).
    * @returns {{move: number|null, score: number, depth: number, nodes: number}}
    */
-  function findBestMove(boardIn, side, levelName) {
-    const level = LEVELS[levelName] || LEVELS.normal;
+  function findBestMove(boardIn, side, paramsIn) {
+    const params = { ...DEFAULT_PARAMS, ...(paramsIn || {}) };
     const board = boardIn.slice();
     const rootMoves = J.legalMoves(board, side);
     if (rootMoves.length === 0) return { move: null, score: 0, depth: 0, nodes: 0 };
     if (rootMoves.length === 1) return { move: rootMoves[0], score: 0, depth: 0, nodes: 0 };
 
-    const deadline = Date.now() + level.timeMs;
-    const search = createSearch(deadline);
+    // 무작위성을 섞는 실력대는 모든 후보의 정확한 점수가 필요하므로 창을 좁히지 않는다
+    const exactRoot = params.noise > 0 || params.mistakeRate > 0;
+    const deadline = Date.now() + params.timeMs;
+    const search = createSearch(deadline, params.quiesce);
     let bestMove = rootMoves[0];
     let bestScore = -Infinity;
+    let scored = [];
     let completedDepth = 0;
 
-    for (let depth = 1; depth <= level.depth; depth++) {
+    for (let depth = 1; depth <= params.depth; depth++) {
       let iterBest = null;
       let iterScore = -Infinity;
-      const scored = [];
+      const iterScored = [];
       try {
         let alpha = -Infinity;
         for (const m of orderMoves(board, rootMoves, bestMove)) {
@@ -127,13 +129,12 @@
           } finally {
             J.unmakeMove(board, m, cap);
           }
-          scored.push({ m, score });
+          iterScored.push({ m, score });
           if (score > iterScore) {
             iterScore = score;
             iterBest = m;
           }
-          // 무작위성을 섞는 단계는 모든 수의 정확한 점수가 필요하므로 창을 좁히지 않는다
-          if (score > alpha && level.noise === 0) alpha = score;
+          if (score > alpha && !exactRoot) alpha = score;
         }
       } catch (e) {
         if (e instanceof Timeout) break;
@@ -142,14 +143,23 @@
       completedDepth = depth;
       bestMove = iterBest;
       bestScore = iterScore;
+      scored = iterScored;
+      if (Math.abs(bestScore) > MATE / 2) break; // 외통수를 찾았다
+    }
 
-      // 쉬움 단계는 일부러 조금 흔들어서 사람 같은 실수를 하게 한다
-      if (level.noise > 0 && depth === level.depth && Math.abs(bestScore) < MATE / 2) {
+    // 약한 급수일수록 사람처럼 실수한다. 단, 지는 외통수를 그냥 내주거나
+    // 이기는 외통수를 놓치지는 않게 한다.
+    if (exactRoot && scored.length > 1 && Math.abs(bestScore) < MATE / 2) {
+      const candidates = scored.filter((o) => o.score > -MATE / 2);
+      if (Math.random() < params.mistakeRate) {
+        const pool = candidates.filter((o) => o.score >= bestScore - params.mistakeMargin);
+        if (pool.length > 0) bestMove = pool[Math.floor(Math.random() * pool.length)].m;
+      } else {
+        const pool = candidates.filter((o) => o.score >= bestScore - params.noise);
         let pick = null;
         let pickScore = -Infinity;
-        for (const { m, score } of scored) {
-          if (score < -MATE / 2) continue;
-          const noisy = score + Math.random() * level.noise;
+        for (const { m, score } of pool) {
+          const noisy = score + Math.random() * (params.noise + 0.01);
           if (noisy > pickScore) {
             pickScore = noisy;
             pick = m;
@@ -157,13 +167,12 @@
         }
         if (pick !== null) bestMove = pick;
       }
-      if (Math.abs(bestScore) > MATE / 2) break; // 외통수를 찾았다
     }
 
     return { move: bestMove, score: bestScore, depth: completedDepth, nodes: search.getNodes() };
   }
 
-  const JanggiAI = { findBestMove, LEVELS, MATE };
+  const JanggiAI = { findBestMove, MATE };
   if (typeof module !== 'undefined' && module.exports) module.exports = JanggiAI;
   global.JanggiAI = JanggiAI;
 })(typeof self !== 'undefined' ? self : this);
