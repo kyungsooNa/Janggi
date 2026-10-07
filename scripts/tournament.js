@@ -1,7 +1,8 @@
 // 급수별 AI끼리 대국시켜 실제로 위 급수가 더 잘 두는지 잰다.
 //   node scripts/tournament.js                 기본: 8개 급수, 이웃 급수끼리 8판씩
 //   node scripts/tournament.js --games 4 --ranks 0,8,16,26 --workers 4 --out result.json
-// 게임 규칙은 화면과 같다: 반복수 금지, 장군 중이 아니면 둘 수 없을 때 한수 쉼, 200수 점수 판정.
+// 게임 규칙은 화면과 같다: 반복수 금지, 장군 중이 아니면 둘 수 없을 때 한수 쉼, 200수 점수 판정,
+// 남은 기물 점수 10점 이하 패배.
 const { Worker, isMainThread, parentPort, workerData } = require('worker_threads');
 const path = require('path');
 const fs = require('fs');
@@ -25,6 +26,9 @@ function playGame({ choRank, hanRank, choSetup, hanSetup }) {
   let plies = 0;
   const started = Date.now();
   for (;;) {
+    if (J.belowMinScore(board, turn)) {
+      return { winner: J.opponent(turn), reason: '점수 미달', plies, ms: Date.now() - started };
+    }
     const legal = J.legalMoves(board, turn);
     if (legal.length === 0 && J.inCheck(board, turn)) {
       return { winner: J.opponent(turn), reason: '외통', plies, ms: Date.now() - started };

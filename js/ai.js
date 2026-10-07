@@ -99,7 +99,7 @@
     return moves[i];
   }
 
-  function createSearch(deadline, quiesceDepth) {
+  function createSearch(deadline, quiesceDepth, useNull) {
     let nodes = 0;
     let h1 = 0;
     let h2 = 0;
@@ -205,7 +205,7 @@
 
       // 널 무브: 한 번 쉬고도 beta 이상이면 이 국면은 더 볼 필요가 없다.
       // 장군 중이면 쉬는 순간 상대가 궁을 잡아 실패하므로 따로 확인하지 않아도 된다.
-      if (allowNull && depth >= 3 && beta < MATE / 2 && hasMajorPieces(board, side)) {
+      if (useNull && allowNull && depth >= 3 && beta < MATE / 2 && hasMajorPieces(board, side)) {
         flipSide();
         const r = depth >= 6 ? 3 : 2;
         const s = -negamax(board, opp, depth - 1 - r, -beta, -beta + EPS, ply + 1, false);
@@ -300,7 +300,7 @@
     // 무작위성을 섞는 실력대는 모든 후보의 정확한 점수가 필요하므로 창을 좁히지 않는다
     const exactRoot = params.noise > 0 || params.mistakeRate > 0;
     const deadline = Date.now() + params.timeMs;
-    const search = createSearch(deadline, params.quiesce);
+    const search = createSearch(deadline, params.quiesce, params.nullMove !== false);
     search.setHash(board, side);
     const opp = J.opponent(side);
 

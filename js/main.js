@@ -229,6 +229,13 @@
     const wasCheck = g.checkSide;
     g.checkSide = check ? side : null;
 
+    // 남은 기물 점수가 기준 미만이면 그 쪽이 바로 진다
+    if (J.belowMinScore(g.board, side)) {
+      render();
+      showToast('점수 미달', 'check');
+      setTimeout(() => endGame(J.opponent(side), '점수 미달'), 900);
+      return;
+    }
     if (check && legal.length === 0) {
       render();
       showToast('외통!', 'check');

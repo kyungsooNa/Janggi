@@ -189,3 +189,16 @@ test('AI는 반복수로 막힌 수를 두지 않는다', () => {
   const res = AI.findBestMove(b, 'c', { ...R.aiParams(20), forbidden: [capture] });
   assert.notEqual(res.move, capture);
 });
+
+test('점수 미달: 남은 기물 점수가 10점 이하면 패배 기준에 걸린다', () => {
+  // 궁 + 차(13) = 13점 → 통과, 궁 + 포(7) = 7점 → 미달
+  const b = boardWith([['cR', 0, 9], ['hC', 0, 2]]);
+  assert.equal(J.MIN_SCORE, 10);
+  assert.ok(!J.belowMinScore(b, 'c'));
+  assert.ok(J.belowMinScore(b, 'h')); // 7 + 덤 1.5 = 8.5
+  assert.ok(!J.belowMinScore(J.initialBoard('마상마상', '마상마상'), 'h'));
+  // 딱 10점(사 3 + 포 7)도 패배
+  const ten = boardWith([['cA', 3, 9], ['cC', 1, 7]]);
+  assert.equal(J.materialScore(ten, 'c'), 10);
+  assert.ok(J.belowMinScore(ten, 'c'));
+});

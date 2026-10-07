@@ -15,6 +15,7 @@
   const CHO = 'c';
   const HAN = 'h';
   const HAN_BONUS = 1.5; // 후수인 한에게 주는 덤
+  const MIN_SCORE = 10;  // 남은 기물 점수가 이 점수 이하가 되면 패배
 
   const VALUE = { K: 0, R: 13, C: 7, H: 5, E: 3, A: 3, P: 2 };
 
@@ -354,6 +355,11 @@
     return (counts.get(positionKey(board, opponent(side))) || 0) >= (limit || 2);
   }
 
+  // 남은 기물 점수가 패배 기준(10점) 이하인가
+  function belowMinScore(board, side) {
+    return materialScore(board, side) <= MIN_SCORE;
+  }
+
   // 남은 기물 점수 (한은 덤 포함)
   function materialScore(board, side) {
     let s = side === HAN ? HAN_BONUS : 0;
@@ -409,7 +415,7 @@
   }
 
   const Janggi = {
-    COLS, ROWS, CHO, HAN, VALUE, NAME, HANJA, SETUPS, HAN_BONUS,
+    COLS, ROWS, CHO, HAN, VALUE, NAME, HANJA, SETUPS, HAN_BONUS, MIN_SCORE, belowMinScore,
     idx, xOf, yOf, inBoard, opponent, palaceOf, isDiagPoint,
     moveFrom, moveTo, makeMoveCode,
     initialBoard, pseudoMoves, legalMoves, legalMovesFrom,
