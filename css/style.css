@@ -17,7 +17,8 @@
   --card-sub: #6c6c70;
   --card-sel: #dcdcde;
   --font-ui: 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
-  --font-glyph: 'Shippori Mincho B1', 'Noto Serif KR', 'Batang', 'AppleMyungjo', serif;  /* 기물 한자: 굵은 명조 */
+  --font-glyph: 'Shippori Mincho B1', 'Noto Serif KR', 'Batang', 'AppleMyungjo', serif;  /* 한: 굵은 정자 */
+  --font-cursive: 'Ma Shan Zheng', 'Noto Serif KR', 'Batang', serif;                      /* 초: 붓 흘림 */
   color-scheme: dark;
 }
 
@@ -181,6 +182,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .player.opp .clock-row { justify-content: flex-start; }
 .player .time { font-size: clamp(17px, 4.8vw, 22px); font-weight: 700; color: var(--muted); }
 .player .byo { font-size: clamp(30px, 8.5vw, 40px); font-weight: 700; line-height: 0.8; color: var(--muted); }
+.side-mark.cho { font-family: var(--font-cursive); font-weight: 400; -webkit-text-stroke: 0.8px currentColor; }
 .player .id-row { display: flex; align-items: center; gap: 10px; }
 .player.opp .id-row { justify-content: flex-end; }
 .avatar {
@@ -301,7 +303,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .mini .glyph { font-family: var(--font-glyph); font-weight: 800; text-anchor: middle; dominant-baseline: central; }
 /* 획을 같은 색 테두리로 살짝 두껍게 해 장기알에 새긴 느낌을 낸다 */
 .glyph.han { stroke: var(--han); stroke-width: 0.8; stroke-linejoin: round; paint-order: stroke; }
-.glyph.cho { stroke: var(--cho); stroke-width: 0.8; stroke-linejoin: round; paint-order: stroke; }
+.glyph.cho { font-family: var(--font-cursive); font-weight: 400; stroke: var(--cho); stroke-width: 1.6; stroke-linejoin: round; paint-order: stroke; }
 
 .side-pick { display: grid; grid-template-columns: auto 1fr 1fr; align-items: center; gap: 8px; }
 .side-pick .label { font-size: 16px; font-weight: 900; color: #444; margin-right: 4px; }
@@ -311,7 +313,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   display: flex; align-items: center; justify-content: center; gap: 6px;
 }
 .side-btn .hz { font-family: var(--font-glyph); font-weight: 800; font-size: 22px; }
-.side-btn .hz.cho { color: var(--cho); }
+.side-btn .hz.cho { font-family: var(--font-cursive); font-weight: 400; color: var(--cho); }
 .side-btn .hz.han { color: var(--han); }
 .side-btn[aria-pressed="true"] { background: var(--card-sel); box-shadow: inset 0 0 0 2px #b9b9bd; color: #222; }
 .toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 15px; font-weight: 700; color: #555; }
@@ -373,7 +375,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .btn-link { height: 36px; border: 0; background: none; color: #6c6c70; font-size: 15px; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .dlg-body > .btn-sub { height: 46px; font-size: 16px; }
 .hz { font-family: var(--font-glyph); font-weight: 800; }
-.hz.cho { color: var(--cho); }
+.hz.cho { font-family: var(--font-cursive); font-weight: 400; color: var(--cho); }
 .hz.han { color: var(--han); }
 .split { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13.5px; font-weight: 700; color: #555; font-variant-numeric: tabular-nums; }
 .split > span { background: #fff; border-radius: 10px; padding: 8px 10px; display: flex; align-items: center; gap: 6px; }
