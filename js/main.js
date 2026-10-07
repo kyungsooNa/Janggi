@@ -193,6 +193,13 @@
     g.history.push({ m, piece, captured, side: g.turn, note: J.notation(piece, m) });
     finishTurn();
     countPosition(1);
+    if (g.view) {
+      // 되감아 보는 중이면 판은 그대로 두고 알림만
+      if (piece[0] === g.aiSide) showToast('상대가 두었어요', 'small');
+      render();
+      afterTurn();
+      return;
+    }
     flyPiece(from, to, piece, captured, afterTurn);
   }
 
@@ -321,7 +328,7 @@
   });
 
   function onPoint(i) {
-    if (!isMyTurn()) return;
+    if (g.view || !isMyTurn()) return;
     if (g.selected >= 0 && g.targets.includes(i)) {
       playMove(J.makeMoveCode(g.selected, i));
       return;
@@ -349,6 +356,7 @@
 
   $('btn-pass').addEventListener('click', () => {
     if (g && g.replay) { replayStep(-1); return; }
+    if (g && g.view) { viewStep(-1); return; }
     if (!isMyTurn()) return;
     if (J.inCheck(g.board, g.mySide)) {
       showToast('장군 중에는 쉴 수 없어요', 'small');
@@ -363,6 +371,7 @@
 
   $('btn-resign').addEventListener('click', () => {
     if (g && g.replay) { replayStep(1); return; }
+    if (g && g.view) { viewStep(1); return; }
     if (!g || !g.started || g.over) return;
     openDialog(`
       <div class="dlg-body">
@@ -379,6 +388,7 @@
 
   $('btn-items').addEventListener('click', () => {
     if (g && g.replay) { showRecordsDialog(); return; }
+    if (g && g.view) { if (g.over) newGame(); else exitView(); return; }
     if (!g || !g.started || g.over) return;
     const canUndo = g.items.undo > 0 && g.history.some((h) => h.side === g.mySide);
     const canHint = g.items.hint > 0 && isMyTurn();
@@ -443,14 +453,21 @@
   }
 
   $('btn-log').addEventListener('click', () => {
-    const items = g ? g.history.map((h, k) => `<li class="${h.side}"><span class="n">${k + 1}.</span><b>${h.note}</b></li>`).join('') : '';
+    const canView = g && g.started && !g.replay;
+    const items = g ? g.history.map((h, k) => `<li class="${h.side}"><button type="button" class="mv" data-act="goto" data-ply="${k + 1}" ${canView ? '' : 'disabled'}><span class="n">${k + 1}.</span><b>${h.note}</b></button></li>`).join('') : '';
     openDialog(`
       ${head('기보')}
       <div class="dlg-body">
         <div class="log">${items ? `<ol>${items}</ol>` : '<div class="empty">아직 둔 수가 없습니다</div>'}</div>
-        <p>표기: 출발 위치(행·열) + 기물 + 도착 위치. 행은 위에서부터 1~9, 0, 열은 왼쪽부터 1~9입니다.</p>
+        <p>${canView && items ? '수를 누르면 그 수까지 되감아 볼 수 있습니다. ' : ''}표기: 출발 위치(행·열) + 기물 + 도착 위치. 행은 위에서부터 1~9, 0, 열은 왼쪽부터 1~9입니다.</p>
       </div>
-      <div class="dlg-foot"><button type="button" class="btn-sub" data-act="close">닫기</button></div>`);
+      <div class="dlg-foot">
+        <button type="button" class="btn-sub" data-act="close">닫기</button>
+        ${canView && items ? '<button type="button" class="btn-main" data-act="rewind">되감아 보기</button>' : ''}
+      </div>`, {
+      goto: (b) => { closeDialog(); enterView(Number(b.dataset.ply)); },
+      rewind: () => { closeDialog(); enterView(Math.max(0, g.history.length - 1)); },
+    });
   });
 
   $('btn-settings').addEventListener('click', () => showProfileDialog(false));
@@ -565,10 +582,14 @@
         </div>
       </div>
       <div class="dlg-foot">
-        <button type="button" class="btn-sub" data-act="close">판 보기</button>
+        <button type="button" class="btn-sub" data-act="review">수 되감기</button>
         <button type="button" class="btn-main" data-act="again">다시 대국</button>
       </div>
-      <div class="dlg-foot"><button type="button" class="btn-link" data-act="records">대국 기록 보기</button></div>`, { again: newGame, records: () => showRecordsDialog() });
+      <div class="dlg-foot"><button type="button" class="btn-link" data-act="records">대국 기록 보기</button></div>`, {
+      again: newGame,
+      records: () => showRecordsDialog(),
+      review: () => { closeDialog(); enterView(g.history.length); },
+    });
   }
 
   function showProfileDialog(first) {
@@ -611,6 +632,59 @@
         newGame();
       },
     });
+  }
+
+  // ───────────── 둔 수 되감기 ─────────────
+  // 되감기 중에는 g.view 의 판을, 아니면 실제 판을 보여 준다
+  const shownBoard = () => (g.view ? g.view.board : g.board);
+  const shownHistory = () => (g.view ? g.history.slice(0, g.view.ply) : g.history);
+
+  function viewAt(ply) {
+    const board = buildBoard();
+    let turn = J.CHO;
+    for (const h of g.history.slice(0, ply)) {
+      if (!h.pass) J.makeMove(board, h.m);
+      turn = J.opponent(turn);
+    }
+    return { ply, board, turn, checkSide: J.inCheck(board, turn) ? turn : null };
+  }
+
+  function enterView(ply) {
+    if (!g || !g.started) return;
+    cancelFlight();
+    g.selected = -1;
+    g.targets = [];
+    g.repeatTargets = [];
+    g.view = viewAt(Math.max(0, Math.min(ply, g.history.length)));
+    render();
+  }
+
+  function exitView() {
+    cancelFlight();
+    g.view = null;
+    render();
+  }
+
+  function viewStep(dir) {
+    const v = g.view;
+    const next = v.ply + dir;
+    if (next < 0 || next > g.history.length) return;
+    cancelFlight();
+    if (dir > 0) {
+      const h = g.history[v.ply];
+      g.view = viewAt(next);
+      if (h.pass) {
+        render();
+        showToast('한수 쉼', 'small');
+      } else {
+        flyPiece(J.moveFrom(h.m), J.moveTo(h.m), h.piece, h.captured, () => {
+          if (g.view && g.view.checkSide) showToast('장군!', 'check');
+        });
+      }
+    } else {
+      g.view = viewAt(next);
+      render();
+    }
   }
 
   // ───────────── 대국 기록 · 기보 재생 ─────────────
@@ -736,9 +810,11 @@
 
   // 기보 재생 중 키보드 ← →
   window.addEventListener('keydown', (e) => {
-    if (!g || !g.replay || !$('overlay').hidden) return;
-    if (e.key === 'ArrowLeft') replayStep(-1);
-    else if (e.key === 'ArrowRight') replayStep(1);
+    if (!g || !$('overlay').hidden) return;
+    const step = g.replay ? replayStep : g.view ? viewStep : null;
+    if (!step) return;
+    if (e.key === 'ArrowLeft') step(-1);
+    else if (e.key === 'ArrowRight') step(1);
   });
 
   function applyProfileForm() {
@@ -844,7 +920,9 @@
     if (!g) return;
     ensureLayers();
     const out = [];
-    const moves = g.history.filter((h) => !h.pass);
+    const B = shownBoard();
+    const moves = shownHistory().filter((h) => !h.pass);
+    const checkSide = g.view ? g.view.checkSide : g.checkSide;
     const last = moves[moves.length - 1];
     const hidden = g.flying ? g.flying.to : -1; // 날아가는 중인 기물은 fx 층에서 그린다
 
@@ -853,21 +931,21 @@
       const [x, y] = px(J.moveFrom(h.m));
       out.push(`<path class="xmark" d="M${x - 9} ${y - 9}L${x + 9} ${y + 9}M${x + 9} ${y - 9}L${x - 9} ${y + 9}"/>`);
     }
-    const live = !g.over || g.replay;
+    const live = !g.over || g.replay || g.view;
     if (last && live && !g.flying) {
       const [x, y] = px(J.moveTo(last.m));
       out.push(`<circle class="glow" cx="${x}" cy="${y}" r="${RADIUS[last.piece[1]] + 18}" fill="url(#glow)"/>`);
     }
 
     for (let i = 0; i < 90; i++) {
-      const p = g.board[i];
+      const p = B[i];
       if (!p || i === hidden) continue;
       const [x, y] = px(i);
       const r = RADIUS[p[1]];
       const sel = i === g.selected;
       out.push(`<g class="piece${sel ? ' selected' : ''}" data-i="${i}" style="transform:translate(${x}px,${y - (sel ? 6 : 0)}px) scale(${sel ? 1.05 : 1})">${pieceShape(p, r)}`
         + (sel ? `<polygon class="sel-ring" points="${octagon(r + 1)}"/>` : '')
-        + (p[1] === 'K' && g.checkSide === p[0] && live ? `<circle class="check-ring" r="${r + 10}"/>` : '')
+        + (p[1] === 'K' && checkSide === p[0] && live ? `<circle class="check-ring" r="${r + 10}"/>` : '')
         + '</g>');
     }
     // 훈수 이동선은 기물 위에 그려야 경로에 있는 기물에 가리지 않는다
@@ -1052,24 +1130,26 @@
 
   function renderPanel() {
     const n = g.history.length;
-    if (g.replay) $('title').textContent = `기보 재생 ${n} / ${g.replay.rec.moves.length}수`;
+    if (g.view) $('title').textContent = `되감기 ${g.view.ply} / ${n}수`;
+    else if (g.replay) $('title').textContent = `기보 재생 ${n} / ${g.replay.rec.moves.length}수`;
     else if (n >= MOVE_LIMIT - 20) $('title').textContent = `승강급 대국 - ${n} / ${MOVE_LIMIT}수`;
     else $('title').textContent = n > 0 ? `승강급 대국 - ${n}수` : '승강급 대국';
     for (const [id, side] of [['me-side', g.mySide], ['opp-side', g.aiSide]]) {
       $(id).textContent = side === J.CHO ? '楚' : '漢';
       $(id).className = `side-mark ${side === J.CHO ? 'cho' : 'han'}`;
     }
-    $('me-score').textContent = `${J.materialScore(g.board, g.mySide).toFixed(1)}점`;
-    $('opp-score').textContent = `${J.materialScore(g.board, g.aiSide).toFixed(1)}점`;
+    $('me-score').textContent = `${J.materialScore(shownBoard(), g.mySide).toFixed(1)}점`;
+    $('opp-score').textContent = `${J.materialScore(shownBoard(), g.aiSide).toFixed(1)}점`;
     $('me-rank').textContent = R.rankName(g.replay ? g.replay.rec.myRank : profile.rank);
     $('me-name').textContent = profile.name;
     $('opp-rank').textContent = R.rankName(g.oppRank);
     $('opp-name').textContent = g.oppName;
-    const active = (g.started && !g.over) || !!g.replay;
-    $('player-me').classList.toggle('active', active && g.turn === g.mySide);
-    $('player-opp').classList.toggle('active', active && g.turn === g.aiSide);
+    const active = (g.started && !g.over) || !!g.replay || !!g.view;
+    const turn = g.view ? g.view.turn : g.turn;
+    $('player-me').classList.toggle('active', active && turn === g.mySide);
+    $('player-opp').classList.toggle('active', active && turn === g.aiSide);
     const bar = document.querySelector('.turnbar');
-    bar.classList.toggle('opp', g.turn === g.aiSide);
+    bar.classList.toggle('opp', turn === g.aiSide);
     bar.classList.toggle('none', !active);
     renderClocks();
   }
@@ -1084,8 +1164,16 @@
   }
 
   function updateButtons() {
-    const labels = g && g.replay ? ['◀ 이전', '다음 ▶', '기록 목록'] : ['한수 쉼', '기 권', '아이템'];
+    let labels = ['한수 쉼', '기 권', '아이템'];
+    if (g && g.replay) labels = ['◀ 이전', '다음 ▶', '기록 목록'];
+    else if (g && g.view) labels = ['◀ 이전', '다음 ▶', g.over ? '새 대국' : '대국으로'];
     ['btn-pass', 'btn-resign', 'btn-items'].forEach((id, k) => { $(id).textContent = labels[k]; });
+    if (g && g.view) {
+      $('btn-pass').disabled = g.view.ply === 0;
+      $('btn-resign').disabled = g.view.ply >= g.history.length;
+      $('btn-items').disabled = false;
+      return;
+    }
     if (g && g.replay) {
       $('btn-pass').disabled = g.replay.ply === 0;
       $('btn-resign').disabled = g.replay.ply >= g.replay.rec.moves.length;

@@ -360,7 +360,10 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .log { max-height: 46vh; overflow: auto; background: #fff; border-radius: 12px; padding: 10px 6px; }
 .log ol { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: 1fr 1fr; column-gap: 8px; row-gap: 2px; font-variant-numeric: tabular-nums; }
-.log li { display: flex; gap: 8px; padding: 4px 8px; border-radius: 6px; font-size: 15px; }
+.log li { display: block; }
+.log .mv { width: 100%; display: flex; gap: 8px; padding: 4px 8px; border: 0; border-radius: 6px; background: none; font-size: 15px; text-align: left; color: #333; cursor: pointer; }
+.log .mv:hover:not(:disabled) { background: #f1f1f2; }
+.log .mv:disabled { cursor: default; }
 .log li .n { color: #9a9a9e; min-width: 2.2em; text-align: right; }
 .log li.c b { color: var(--cho); }
 .log li.h b { color: var(--han); }
