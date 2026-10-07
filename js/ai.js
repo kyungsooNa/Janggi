@@ -99,7 +99,7 @@
     return moves[i];
   }
 
-  function createSearch(deadline, quiesceDepth, useNull) {
+  function createSearch(deadline, quiesceDepth, useNull, useLmr) {
     let nodes = 0;
     let h1 = 0;
     let h2 = 0;
@@ -229,12 +229,16 @@
       let bestMove = -1;
       for (let i = 0; i < moves.length; i++) {
         const m = pickNext(moves, scores, i);
+        const quiet = !board[m & 127] && m !== k0 && m !== k1;
         const cap = make(board, m);
         let score;
         if (i === 0) {
           score = -negamax(board, opp, depth - 1, -beta, -alpha, ply + 1, true);
         } else {
-          score = -negamax(board, opp, depth - 1, -alpha - EPS, -alpha, ply + 1, true);
+          // 뒤쪽의 조용한 수는 한 수 덜 읽어 보고, alpha 를 넘을 때만 제대로 다시 읽는다
+          const reduce = useLmr && quiet && depth >= 3 && i >= 3 ? 1 : 0;
+          score = -negamax(board, opp, depth - 1 - reduce, -alpha - EPS, -alpha, ply + 1, true);
+          if (reduce && score > alpha) score = -negamax(board, opp, depth - 1, -alpha - EPS, -alpha, ply + 1, true);
           if (score > alpha && score < beta) score = -negamax(board, opp, depth - 1, -beta, -alpha, ply + 1, true);
         }
         unmake(board, m, cap);
@@ -300,7 +304,7 @@
     // 무작위성을 섞는 실력대는 모든 후보의 정확한 점수가 필요하므로 창을 좁히지 않는다
     const exactRoot = params.noise > 0 || params.mistakeRate > 0;
     const deadline = Date.now() + params.timeMs;
-    const search = createSearch(deadline, params.quiesce, params.nullMove !== false);
+    const search = createSearch(deadline, params.quiesce, params.nullMove !== false, params.lmr !== false);
     search.setHash(board, side);
     const opp = J.opponent(side);
 
@@ -338,8 +342,15 @@
           if (score > alpha && !exactRoot) alpha = score;
         }
       } catch (e) {
-        if (e instanceof Timeout) break;
-        throw e;
+        if (!(e instanceof Timeout)) throw e;
+        // 시간이 다 돼 이번 깊이를 끝내지 못했어도, 다 읽은 후보 중 지난 깊이의 최선보다
+        // 나은 수가 있으면 그 수를 쓴다 (첫 후보는 지난 깊이의 최선 수다).
+        // 무작위를 섞는 실력대는 모든 후보 점수가 필요하므로 지난 깊이 결과를 그대로 쓴다.
+        if (!exactRoot && iterBest !== null && iterBest !== bestMove && iterScore > -MATE / 2) {
+          bestMove = iterBest;
+          bestScore = iterScore;
+        }
+        break;
       }
       completedDepth = depth;
       bestMove = iterBest;
