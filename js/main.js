@@ -228,7 +228,7 @@
     g.thinking = true;
     updateButtons();
     const started = Date.now();
-    const think = 500 + Math.random() * 900; // 너무 빨리 두면 어색하므로 최소 생각 시간
+    const think = 250 + Math.random() * 450; // 너무 빨리 두면 어색하므로 최소 생각 시간
     runAI(g.board, g.aiSide, R.aiParams(g.oppRank), (res) => {
       if (id !== reqSeq || g.over) return;
       const wait = Math.max(0, think - (Date.now() - started));
@@ -847,7 +847,7 @@
       { transform: `translate(${x}px,${y}px) scale(1)` },
       { transform: `translate(${x}px,${y - 9}px) scale(1.08)`, offset: 0.6 },
       { transform: `translate(${x}px,${y - 6}px) scale(1.05)` },
-    ], { duration: 110, easing: 'ease-out' });
+    ], { duration: 80, easing: 'ease-out' });
   }
 
   const reducedMotion = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -865,8 +865,8 @@
     const r = RADIUS[piece[1]];
     const dist = Math.hypot(x2 - x1, y2 - y1) / S;
     const quick = reducedMotion();
-    const dur = quick ? 1 : Math.min(360, 190 + dist * 22);
-    const lift = 6 + Math.min(12, dist * 2);
+    const dur = quick ? 1 : Math.min(240, 130 + dist * 14);
+    const lift = 4 + Math.min(8, dist * 1.5);
     const token = {};
     g.flying = { to, token, timers: [] };
 
