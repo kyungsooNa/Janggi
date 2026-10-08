@@ -259,3 +259,22 @@ test('평가 v1·v2·v3는 초·한을 뒤바꾸면 정확히 반대 값이 된�
     }
   }
 });
+
+test('반복수: 궁과 사가 움직이는 수는 반복돼도 막지 않는다', () => {
+  const b = boardWith([['cA', 3, 9], ['cR', 0, 9]]);
+  const next = (m) => {
+    const cap = J.makeMove(b, m);
+    const k = J.positionKey(b, 'h');
+    J.unmakeMove(b, m, cap);
+    return k;
+  };
+  const kingMove = J.makeMoveCode(sq(4, 8), sq(4, 7));
+  const advisorMove = J.makeMoveCode(sq(3, 9), sq(3, 8));
+  const rookMove = J.makeMoveCode(sq(0, 9), sq(0, 8));
+  // 세 수 모두 "이미 두 번 나온 국면"을 만든다고 치면
+  const counts = new Map([[next(kingMove), 2], [next(advisorMove), 2], [next(rookMove), 2]]);
+  const allowed = J.nonRepeatingMoves(b, 'c', [kingMove, advisorMove, rookMove], counts);
+  assert.ok(allowed.includes(kingMove));
+  assert.ok(allowed.includes(advisorMove));
+  assert.ok(!allowed.includes(rookMove));
+});

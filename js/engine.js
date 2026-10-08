@@ -337,12 +337,15 @@
   /*
    * 반복수 금지: 둔 뒤의 국면이 이미 limit 번(기본 2번) 나왔던 수는 뺀다.
    * 즉 같은 국면을 세 번째로 만드는 수는 둘 수 없다.
+   * 단, 궁과 사가 움직이는 수는 수비를 위한 수라 반복돼도 막지 않는다.
    * counts 는 positionKey → 나온 횟수 Map.
    */
   function nonRepeatingMoves(board, side, moves, counts, limit) {
     const max = limit || 2;
     const next = opponent(side);
     return moves.filter((m) => {
+      const t = board[moveFrom(m)][1];
+      if (t === 'K' || t === 'A') return true;
       const cap = makeMove(board, m);
       const n = counts.get(positionKey(board, next)) || 0;
       unmakeMove(board, m, cap);
