@@ -330,6 +330,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .rank-box .rank-now { font-size: 26px; font-weight: 900; }
 .rank-box .rank-change { font-size: 15px; font-weight: 700; color: #e5772a; }
 .rank-box .rank-change.down { color: #5b6170; }
+.rank-box .rank-stats { font-size: 13px; color: var(--card-sub); font-variant-numeric: tabular-nums; }
 .meter { display: flex; gap: 6px; align-items: center; font-size: 13px; color: var(--card-sub); }
 .meter i { width: 16px; height: 16px; border-radius: 50%; background: #dedee0; display: inline-block; }
 .meter i.up { background: #e5772a; }

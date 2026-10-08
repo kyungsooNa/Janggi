@@ -578,6 +578,11 @@
           <span class="rank-now">${R.rankName(profile.rank)}</span>
           ${meterHTML()}
           ${changeText}
+          <span class="rank-stats">${(() => {
+            const here = rankStats(beforeRank);
+            const all = overallStats();
+            return `${R.rankName(beforeRank)} ${statText(here)} (${here.rate}%) · 전체 ${statText(all)} (${all.rate}%)`;
+          })()}</span>
         </div>
       </div>
       <div class="dlg-foot">
@@ -606,7 +611,11 @@
           <option value="h" ${profile.sidePref === 'h' ? 'selected' : ''}>항상 한 (漢, 덤 1.5점)</option>
         </select></div>
         <label class="toggle" for="pf-sound">착수 효과음 <input type="checkbox" id="pf-sound" ${profile.sound === false ? '' : 'checked'}></label>
-        ${first ? '' : `<div class="record"><div><b>${profile.wins || 0}</b><span>승</span></div><div><b>${profile.losses || 0}</b><span>패</span></div><div><b>${profile.points > 0 ? '+' : ''}${profile.points}</b><span>승급 점수</span></div></div>`}
+        ${first ? '' : (() => {
+          const all = overallStats();
+          const here = rankStats(profile.rank);
+          return `<div class="record"><div><b>${statText(all)}</b><span>전체 ${rateText(all)}</span></div><div><b>${statText(here)}</b><span>${R.rankName(profile.rank)} ${rateText(here)}</span></div><div><b>${profile.points > 0 ? '+' : ''}${profile.points}</b><span>승급 점수</span></div></div>`;
+        })()}
         ${first ? '' : meterHTML()}
         ${first ? '' : '<button type="button" class="btn-sub" data-act="records">대국 기록 보기</button>'}
         ${playing ? '<p>급수와 진영을 바꾸면 다음 대국부터 적용됩니다.</p>' : ''}
@@ -700,9 +709,22 @@
     return { w, l, rate, n: list.length };
   }
 
+  // 전체 승률은 프로필의 평생 승패, 현재 급수 승률은 그 급수로 둔 대국 기록에서 센다
+  function overallStats() {
+    const w = profile.wins || 0;
+    const l = profile.losses || 0;
+    return { w, l, n: w + l, rate: w + l ? Math.round((w / (w + l)) * 100) : 0 };
+  }
+  function rankStats(rank) {
+    return statLine(records.filter((r) => r.myRank === rank));
+  }
+  const statText = (st) => `${st.w}승 ${st.l}패`;
+  const rateText = (st) => (st.n ? `승률 ${st.rate}%` : '기록 없음');
+
   function showRecordsDialog() {
     const playing = g && g.started && !g.over && !g.replay;
-    const all = statLine(records);
+    const all = overallStats();
+    const here = rankStats(profile.rank);
     const cho = statLine(records.filter((r) => r.mySide === J.CHO));
     const han = statLine(records.filter((r) => r.mySide === J.HAN));
     let streak = 0;
@@ -721,8 +743,8 @@
       ${head('대국 기록')}
       <div class="dlg-body">
         <div class="record">
-          <div><b>${all.n}</b><span>대국</span></div>
-          <div><b>${all.w}승 ${all.l}패</b><span>승률 ${all.rate}%</span></div>
+          <div><b>${statText(all)}</b><span>전체 ${rateText(all)}</span></div>
+          <div><b>${statText(here)}</b><span>${R.rankName(profile.rank)} ${rateText(here)}</span></div>
           <div><b>${streakText}</b><span>최근 흐름</span></div>
         </div>
         <div class="split">
