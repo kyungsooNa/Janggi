@@ -553,7 +553,12 @@
       <div class="dlg-body">
         <div><h3>상차림 선택</h3><p>대국 시작시 상/마의 위치를 선택합니다. ${firstNote}</p></div>
         <div class="side-pick"><span class="label">내 진영</span>${sideBtn(J.CHO)}${sideBtn(J.HAN)}</div>
-        <div class="setup-opp"><span class="label">${oppLabel}</span><span>${setupRow(g.aiSide, g.aiSetup, true)}</span></div>
+        <div class="setup-opp">
+          <span class="label">${oppLabel}<small>${g.aiSetupPicked ? '직접 고름' : '무작위'}</small></span>
+          <button type="button" class="opp-pick" data-act="opp-next" aria-label="상대 상차림 바꾸기 (지금 ${g.aiSetup})">${setupRow(g.aiSide, g.aiSetup, true)}</button>
+          <button type="button" class="opp-random" data-act="opp-random" aria-label="상대 상차림 무작위">무작위</button>
+        </div>
+        <p class="opp-hint">상대 기물을 누르면 상차림이 바뀝니다.</p>
         <div class="setup-grid">${opts}</div>
       </div>
       <div class="dlg-foot"><button type="button" class="btn-main" data-act="start">확인</button></div>`, {
@@ -562,6 +567,21 @@
         $('dialog').querySelectorAll('.setup-opt').forEach((o) => o.setAttribute('aria-pressed', String(o === b)));
         g.board = buildBoard();
         render();
+      },
+      // 상대 상차림: 누를 때마다 다음 것으로, 무작위 버튼은 다시 무작위로
+      'opp-next': () => {
+        g.aiSetup = SETUP_NAMES[(SETUP_NAMES.indexOf(g.aiSetup) + 1) % SETUP_NAMES.length];
+        g.aiSetupPicked = true;
+        g.board = buildBoard();
+        render();
+        showSetupDialog(true);
+      },
+      'opp-random': () => {
+        g.aiSetup = SETUP_NAMES[Math.floor(Math.random() * SETUP_NAMES.length)];
+        g.aiSetupPicked = false;
+        g.board = buildBoard();
+        render();
+        showSetupDialog(true);
       },
       side: (b) => {
         if (b.dataset.side === g.mySide) return;
