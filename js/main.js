@@ -115,11 +115,25 @@
     reqSeq++;
     clearInterval(setupTimer);
     cancelFlight();
+    // 진영: 기본은 지난 판에 진 쪽이 초(먼저 둠). '항상 초/한'으로 고정할 수도 있다.
     const pref = profile.sidePref;
-    const mySide = pref === J.CHO || pref === J.HAN ? pref : (Math.random() < 0.5 ? J.CHO : J.HAN);
+    const last = records[0];
+    let mySide;
+    let sideReason;
+    if (pref === J.CHO || pref === J.HAN) {
+      mySide = pref;
+      sideReason = 'fixed';
+    } else if (last) {
+      mySide = last.won ? J.HAN : J.CHO;
+      sideReason = last.won ? 'won' : 'lost';
+    } else {
+      mySide = Math.random() < 0.5 ? J.CHO : J.HAN;
+      sideReason = 'first';
+    }
     const aiSetup = SETUP_NAMES[Math.floor(Math.random() * SETUP_NAMES.length)];
     g = {
       mySide,
+      sideReason,
       aiSide: J.opponent(mySide),
       oppName: OPP_NAMES[Math.floor(Math.random() * OPP_NAMES.length)],
       oppRank: profile.rank,
@@ -559,7 +573,10 @@
         <span class="pieces">${setupRow(g.mySide, name)}</span>
         <span class="setup-name">${setupName(name)}</span>
       </button>`).join('');
-    const firstNote = g.mySide === J.CHO ? '초(楚)는 먼저 둡니다.' : '한(漢)은 덤 1.5점을 받고 나중에 둡니다.';
+    const why = { lost: '지난 판에 져서 ', won: '지난 판에 이겨서 ', first: '', fixed: '' }[g.sideReason] || '';
+    const firstNote = g.mySide === J.CHO
+      ? `${why}초(楚)를 잡았습니다. 먼저 둡니다.`
+      : `${why}한(漢)을 잡았습니다. 덤 1.5점을 받고 나중에 둡니다.`;
     openDialog(`
       ${head('승강급 대국', 'setup-count')}
       <div class="dlg-body">
@@ -598,6 +615,7 @@
       side: (b) => {
         if (b.dataset.side === g.mySide) return;
         g.mySide = b.dataset.side;
+        g.sideReason = 'manual';
         g.aiSide = J.opponent(g.mySide);
         g.board = buildBoard();
         render();
@@ -671,7 +689,7 @@
         <div class="field"><label for="pf-name">닉네임</label><input id="pf-name" maxlength="10" value="${escapeHTML(profile.name)}"></div>
         <div class="field"><label for="pf-rank">급수 (18급 ~ 9단)</label><select id="pf-rank">${options}</select></div>
         <div class="field"><label for="pf-side">내 진영</label><select id="pf-side">
-          <option value="random" ${!profile.sidePref || profile.sidePref === 'random' ? 'selected' : ''}>대국마다 무작위</option>
+          <option value="loser" ${profile.sidePref !== 'c' && profile.sidePref !== 'h' ? 'selected' : ''}>진 사람이 초 (첫 판은 무작위)</option>
           <option value="c" ${profile.sidePref === 'c' ? 'selected' : ''}>항상 초 (楚, 먼저 둠)</option>
           <option value="h" ${profile.sidePref === 'h' ? 'selected' : ''}>항상 한 (漢, 덤 1.5점)</option>
         </select></div>
