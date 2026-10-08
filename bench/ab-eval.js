@@ -12,8 +12,11 @@ const arg = (name, def) => {
 };
 const games = Number(arg('games', 40));
 const depth = Number(arg('depth', 4));
-const A = Number(arg('a', 1));
-const B = Number(arg('b', 2));
+// --a / --b: 숫자면 평가 버전, JSON 이면 그대로 설정에 덮어쓴다. 예) --a '{"evalVersion":2}' --b '{"evalVersion":2,"checkExt":true}'
+const asParams = (v) => (/^\d+$/.test(v) ? { evalVersion: Number(v) } : JSON.parse(v));
+const A = asParams(arg('a', '1'));
+const B = asParams(arg('b', '2'));
+const label = (o) => JSON.stringify(o);
 const workers = Number(arg('workers', require('os').cpus().length));
 const SETUPS = Object.keys(J.SETUPS);
 
@@ -26,8 +29,8 @@ for (let n = 0; n < games; n++) {
   const bIsCho = n % 2 === 0;
   jobs.push({
     bIsCho,
-    choParams: { ...base, evalVersion: bIsCho ? B : A },
-    hanParams: { ...base, evalVersion: bIsCho ? A : B },
+    choParams: { ...base, ...(bIsCho ? B : A) },
+    hanParams: { ...base, ...(bIsCho ? A : B) },
     choSetup: SETUPS[Math.floor(n / 2) % 4],
     hanSetup: SETUPS[Math.floor(n / 8) % 4],
     randomPlies: 2,
@@ -47,12 +50,12 @@ for (let w = 0; w < Math.min(workers, jobs.length); w++) {
     const bSide = r.bIsCho ? J.CHO : J.HAN;
     if (r.winner === bSide) bWins++;
     reasons[r.reason] = (reasons[r.reason] || 0) + 1;
-    process.stdout.write(`\r${done}/${jobs.length}판  평가 v${B} ${bWins}승 ${done - bWins}패`);
+    process.stdout.write(`\r${done}/${jobs.length}판  B ${bWins}승 ${done - bWins}패`);
     if (done === jobs.length) {
       const rate = bWins / done;
       // 승률의 대략적인 95% 구간 (정규 근사)
       const half = 1.96 * Math.sqrt((rate * (1 - rate)) / done);
-      console.log(`\n${time ? `한 수 ${time}ms` : `깊이 ${depth}`}: v${B} 승률 ${(rate * 100).toFixed(0)}% (±${(half * 100).toFixed(0)}%) · ${Object.entries(reasons).map(([k, v]) => `${k} ${v}`).join(', ')} · ${((Date.now() - t0) / 60000).toFixed(1)}분`);
+      console.log(`\n${time ? `한 수 ${time}ms` : `깊이 ${depth}`}: B ${label(B)} vs A ${label(A)} → B 승률 ${(rate * 100).toFixed(0)}% (±${(half * 100).toFixed(0)}%) · ${Object.entries(reasons).map(([k, v]) => `${k} ${v}`).join(', ')} · ${((Date.now() - t0) / 60000).toFixed(1)}분`);
     }
     feed();
   });

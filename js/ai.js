@@ -60,7 +60,7 @@
 
   class Timeout extends Error {}
 
-  // params.evalVersion: 1 = 기물 점수 + 간단한 위치 보너스, 2 = 활동성·궁 안전 등을 더한 평가
+  // params.evalVersion: 1 = 기물 점수 + 간단한 위치 보너스, 2 = 활동성·궁 안전 등을 더한 평가, 3 = 2 + 공격 배치
   let evaluateFn = J.evaluate;
   function scoreFor(board, side) {
     const e = evaluateFn(board);
@@ -102,7 +102,7 @@
     return moves[i];
   }
 
-  function createSearch(deadline, quiesceDepth, useNull, useLmr) {
+  function createSearch(deadline, quiesceDepth, useNull, useLmr, useCheckExt) {
     let nodes = 0;
     let h1 = 0;
     let h2 = 0;
@@ -249,17 +249,23 @@
       let allLoseKing = true;
       for (let i = 0; i < moves.length; i++) {
         const m = pickNext(moves, scores, i);
-        const quiet = !board[m & 127] && m !== k0 && m !== k1;
+        let quiet = !board[m & 127] && m !== k0 && m !== k1;
         const cap = make(board, m);
+        // 장군 연장: 장군을 거는 수는 한 수 더 읽는다 (외통 공격·방어를 더 멀리 본다)
+        let next = depth - 1;
+        if (useCheckExt && depth >= 2 && ply < 32) {
+          const k = J.findKing(board, opp);
+          if (k >= 0 && J.isAttacked(board, k, side)) { next = depth; quiet = false; }
+        }
         let score;
         if (i === 0) {
-          score = -negamax(board, opp, depth - 1, -beta, -alpha, ply + 1, true);
+          score = -negamax(board, opp, next, -beta, -alpha, ply + 1, true);
         } else {
           // 뒤쪽의 조용한 수는 한 수 덜 읽어 보고, alpha 를 넘을 때만 제대로 다시 읽는다
           const reduce = useLmr && quiet && depth >= 3 && i >= 3 ? 1 : 0;
-          score = -negamax(board, opp, depth - 1 - reduce, -alpha - EPS, -alpha, ply + 1, true);
-          if (reduce && score > alpha) score = -negamax(board, opp, depth - 1, -alpha - EPS, -alpha, ply + 1, true);
-          if (score > alpha && score < beta) score = -negamax(board, opp, depth - 1, -beta, -alpha, ply + 1, true);
+          score = -negamax(board, opp, next - reduce, -alpha - EPS, -alpha, ply + 1, true);
+          if (reduce && score > alpha) score = -negamax(board, opp, next, -alpha - EPS, -alpha, ply + 1, true);
+          if (score > alpha && score < beta) score = -negamax(board, opp, next, -beta, -alpha, ply + 1, true);
         }
         unmake(board, m, cap);
         if (score !== kingLost) allLoseKing = false;
@@ -323,12 +329,12 @@
       clearTT();
       ttQuiesce = ttKind;
     }
-    evaluateFn = params.evalVersion === 2 ? J.evaluateV2 : J.evaluate;
+    evaluateFn = params.evalVersion === 3 ? J.evaluateV3 : params.evalVersion === 2 ? J.evaluateV2 : J.evaluate;
 
     // 무작위성을 섞는 실력대는 모든 후보의 정확한 점수가 필요하므로 창을 좁히지 않는다
     const exactRoot = params.noise > 0 || params.mistakeRate > 0;
     const deadline = Date.now() + params.timeMs;
-    const search = createSearch(deadline, params.quiesce, params.nullMove !== false, params.lmr !== false);
+    const search = createSearch(deadline, params.quiesce, params.nullMove !== false, params.lmr !== false, params.checkExt === true);
     search.setHash(board, side);
     const opp = J.opponent(side);
 

@@ -439,13 +439,20 @@
   const W2 = {
     rookMob: 0.05, horseMob: 0.12, horseEdge: 0.3, cannonEnd: 1.5, cannonCenter: 0.2,
     pawnLink: 0.12, noAdvisor: 0.9, oneAdvisor: 0.3, intruder: 0.3, pawnIntruder: 0.15,
+    // v3 공격 항목
+    rookPalaceLine: 0.35, rookPalaceRank: 0.25, cannonAim: 0.3, attackerSq: 0.12,
   };
 
   // 마 이동 [다리, 도착] 을 칸 번호 차이로 미리 풀어 둔다 (평가에서 자주 쓰므로)
   const HORSE_D = HORSE.map(([lx, ly, tx, ty]) => [lx, ly, tx, ty]);
 
-  function evaluateV2(board) {
+  // 상대 궁성 줄에 닿는가: 초는 위쪽(y 0~2), 한은 아래쪽(y 7~9)
+  const inEnemyPalaceRows = (cho, y) => (cho ? y <= 2 : y >= 7);
+
+  function evaluateV2(board, attack) {
     let score = -HAN_BONUS;
+    let attackersC = 0; // 상대 궁성을 노리는 초 기물 수
+    let attackersH = 0;
     let majors = 0; // 차·포·마·상 수 (국면 단계)
     let cannonSign = 0; // 초 포 수 - 한 포 수
     let advC = 0;
@@ -469,6 +476,21 @@
         for (let ny = y - 1; ny >= 0; ny--) { const q = board[ny * 9 + x]; if (q !== null) { if (q[0] !== side) mob++; break; } mob++; }
         for (let ny = y + 1; ny < 10; ny++) { const q = board[ny * 9 + x]; if (q !== null) { if (q[0] !== side) mob++; break; } mob++; }
         v += W2.rookMob * mob;
+        if (attack) {
+          let aim = 0;
+          // 궁성 열(3~5열)에서 상대 궁성까지 길이 열려 있는가 (첫 기물이 상대 궁성 안 상대 기물이어도 된다)
+          if (x >= 3 && x <= 5) {
+            const dy = cho ? -1 : 1;
+            for (let ny = y + dy; ny >= 0 && ny < 10; ny += dy) {
+              const q = board[ny * 9 + x];
+              if (inEnemyPalaceRows(cho, ny)) { if (q === null || q[0] !== side) aim = W2.rookPalaceLine; break; }
+              if (q !== null) break;
+            }
+          }
+          // 상대 궁성 줄(가로)을 차지했는가
+          if (inEnemyPalaceRows(cho, y)) aim += W2.rookPalaceRank;
+          if (aim > 0) { v += aim; if (cho) attackersC++; else attackersH++; }
+        }
       } else if (t === 'H') {
         majors++;
         let mob = 0;
@@ -487,6 +509,23 @@
         majors++;
         cannonSign += cho ? 1 : -1;
         if (x === 4) v += W2.cannonCenter;
+        if (attack && x >= 3 && x <= 5) {
+          // 다리(포가 아닌 기물) 하나를 넘어 상대 궁성 줄에 닿는가
+          const dy = cho ? -1 : 1;
+          let screen = false;
+          for (let ny = y + dy; ny >= 0 && ny < 10; ny += dy) {
+            const q = board[ny * 9 + x];
+            if (!screen) {
+              if (q !== null) { if (q[1] === 'C') break; screen = true; }
+            } else {
+              if (inEnemyPalaceRows(cho, ny)) {
+                if (q === null || (q[0] !== side && q[1] !== 'C')) { v += W2.cannonAim; if (cho) attackersC++; else attackersH++; }
+                break;
+              }
+              if (q !== null) break;
+            }
+          }
+        }
       } else if (t === 'E') {
         majors++;
       } else if (t === 'P') {
@@ -498,7 +537,10 @@
       // 상대 궁성 근처(상대 끝 줄에서 네 줄 안, 2~6열)에 들어간 공격 기물
       if (x >= 2 && x <= 6 && t !== 'K' && t !== 'A' && t !== 'E') {
         const depthIn = cho ? y : 9 - y;
-        if (depthIn <= 3) v += t === 'P' ? W2.pawnIntruder : W2.intruder;
+        if (depthIn <= 3) {
+          v += t === 'P' ? W2.pawnIntruder : W2.intruder;
+          if (attack && t !== 'P') { if (cho) attackersC++; else attackersH++; }
+        }
       }
 
       score += cho ? v : -v;
@@ -507,6 +549,7 @@
     // 기물이 줄수록 포는 넘을 기물이 없어 약해진다
     const phase = majors >= 16 ? 1 : majors / 16;
     score -= cannonSign * W2.cannonEnd * (1 - phase);
+    if (attack) score += W2.attackerSq * (attackersC * attackersC - attackersH * attackersH);
     const advPen = (n) => (n === 0 ? W2.noAdvisor : n === 1 ? W2.oneAdvisor : 0);
     score += advPen(advH) - advPen(advC);
     return score;
@@ -528,7 +571,7 @@
     initialBoard, pseudoMoves, legalMoves, legalMovesFrom,
     makeMove, unmakeMove, findKing, inCheck, isAttacked,
     positionKey, nonRepeatingMoves, repetitionForbidden, passRepeats, gameOutcome,
-    materialScore, evaluate, evaluateV2, notation, squareName,
+    materialScore, evaluate, evaluateV2, evaluateV3: (b) => evaluateV2(b, true), notation, squareName,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Janggi;

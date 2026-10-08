@@ -233,7 +233,7 @@ test('AI: 장군이 아닌데 모든 수가 궁을 내주는 국면은 외통이
   assert.ok(res.score < AI.MATE / 2, `score ${res.score}`);
 });
 
-test('평가 v1·v2는 초·한을 뒤바꾸면 정확히 반대 값이 된다 (덤 제외)', () => {
+test('평가 v1·v2·v3는 초·한을 뒤바꾸면 정확히 반대 값이 된다 (덤 제외)', () => {
   // 진영을 바꾸고 위아래를 뒤집은 판: 초의 평가 + 뒤집은 판의 평가 = 덤 두 번(-3)
   const mirror = (b) => {
     const m = empty();
@@ -253,7 +253,7 @@ test('평가 v1·v2는 초·한을 뒤바꾸면 정확히 반대 값이 된다 (
       if (!ms.length) break;
       J.makeMove(b, ms[Math.floor(rnd() * ms.length)]);
       side = J.opponent(side);
-      for (const ev of [J.evaluate, J.evaluateV2]) {
+      for (const ev of [J.evaluate, J.evaluateV2, J.evaluateV3]) {
         assert.ok(Math.abs(ev(b) + ev(mirror(b)) + 2 * J.HAN_BONUS) < 1e-9);
       }
     }
