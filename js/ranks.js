@@ -24,6 +24,7 @@
    *   mistakeRate  : 최선이 아닌 수를 일부러 고를 확률
    *   mistakeMargin: 실수할 때 최선 수 대비 허용하는 점수 손해
    *   quiesce      : 정지 탐색 깊이 (0이면 수읽기 끝에서 맞교환을 보지 못한다)
+   *   evalVersion  : 국면 평가 방식 (js/engine.js 의 evaluate / evaluateV2)
    */
   // 급수별 최대 탐색 깊이 (18급 → 9단). 단 구간은 한 단계마다 한 수씩 더 깊이 읽게 나눴다.
   const DEPTH = [
@@ -47,6 +48,8 @@
       mistakeRate: s < 21 ? Math.max(0, 0.4 - s * 0.019) : 0,
       mistakeMargin: Math.max(0.5, 7 - s * 0.3),
       quiesce: s < 2 ? 0 : s < 6 ? 2 : s < 12 ? 4 : 6,
+      // 평가 v2(활동성·궁 안전 포함)는 같은 생각 시간에서 v1 을 67% 이겼다 (bench/ab-eval.js)
+      evalVersion: 2,
     };
   }
 

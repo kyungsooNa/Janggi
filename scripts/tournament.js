@@ -16,7 +16,8 @@ const SETUPS = Object.keys(J.SETUPS);
 
 // 한 판을 끝까지 둔다. choParams / hanParams 는 findBestMove 에 넘길 AI 설정.
 // 승패 판정은 화면(main.js)과 같은 J.gameOutcome · J.repetitionForbidden 을 쓴다.
-function playGame({ choParams, hanParams, choSetup, hanSetup }) {
+// randomPlies: 처음 몇 수를 무작위로 둬서 같은 설정끼리도 매번 다른 판이 되게 한다.
+function playGame({ choParams, hanParams, choSetup, hanSetup, randomPlies = 0 }) {
   const board = J.initialBoard(choSetup, hanSetup);
   const counts = new Map();
   const seen = (side) => {
@@ -35,7 +36,10 @@ function playGame({ choParams, hanParams, choSetup, hanSetup }) {
     }
     const forbidden = J.repetitionForbidden(board, turn, legal, counts);
     const params = turn === J.CHO ? choParams : hanParams;
-    const res = legal.length ? AI.findBestMove(board, turn, { ...params, forbidden }) : { move: null };
+    let res;
+    if (!legal.length) res = { move: null };
+    else if (plies < randomPlies) res = { move: legal[Math.floor(Math.random() * legal.length)] };
+    else res = AI.findBestMove(board, turn, { ...params, forbidden });
     if (res.move !== null) J.makeMove(board, res.move);
     turn = J.opponent(turn);
     plies++;

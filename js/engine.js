@@ -428,6 +428,90 @@
     return score;
   }
 
+  /*
+   * 평가 v2 (초 입장, 양수면 초 유리). v1 에 더해:
+   *  - 차: 움직일 수 있는 칸 수(활동성)
+   *  - 마: 멱에 막히지 않은 갈 곳 수, 변두리 감점
+   *  - 포: 기물이 줄어 넘을 기물이 없어질수록 가치가 떨어진다, 중앙 포 가산
+   *  - 졸: 옆에 같은 편 졸이 붙어 있으면 가산
+   *  - 궁 안전: 사가 없으면 감점, 상대 공격 기물이 내 궁성 근처에 오면 감점
+   */
+  const W2 = {
+    rookMob: 0.05, horseMob: 0.12, horseEdge: 0.3, cannonEnd: 1.5, cannonCenter: 0.2,
+    pawnLink: 0.12, noAdvisor: 0.9, oneAdvisor: 0.3, intruder: 0.3, pawnIntruder: 0.15,
+  };
+
+  // 마 이동 [다리, 도착] 을 칸 번호 차이로 미리 풀어 둔다 (평가에서 자주 쓰므로)
+  const HORSE_D = HORSE.map(([lx, ly, tx, ty]) => [lx, ly, tx, ty]);
+
+  function evaluateV2(board) {
+    let score = -HAN_BONUS;
+    let majors = 0; // 차·포·마·상 수 (국면 단계)
+    let cannonSign = 0; // 초 포 수 - 한 포 수
+    let advC = 0;
+    let advH = 0;
+
+    for (let i = 0; i < 90; i++) {
+      const p = board[i];
+      if (p === null) continue;
+      const side = p[0];
+      const t = p[1];
+      const cho = side === CHO;
+      const x = i % 9;
+      const y = (i / 9) | 0;
+      let v = VALUE[t] + positional(t, side, x, y);
+
+      if (t === 'R') {
+        majors++;
+        let mob = 0;
+        for (let nx = x - 1; nx >= 0; nx--) { const q = board[y * 9 + nx]; if (q !== null) { if (q[0] !== side) mob++; break; } mob++; }
+        for (let nx = x + 1; nx < 9; nx++) { const q = board[y * 9 + nx]; if (q !== null) { if (q[0] !== side) mob++; break; } mob++; }
+        for (let ny = y - 1; ny >= 0; ny--) { const q = board[ny * 9 + x]; if (q !== null) { if (q[0] !== side) mob++; break; } mob++; }
+        for (let ny = y + 1; ny < 10; ny++) { const q = board[ny * 9 + x]; if (q !== null) { if (q[0] !== side) mob++; break; } mob++; }
+        v += W2.rookMob * mob;
+      } else if (t === 'H') {
+        majors++;
+        let mob = 0;
+        for (let k = 0; k < 8; k++) {
+          const d = HORSE_D[k];
+          const nx = x + d[2];
+          const ny = y + d[3];
+          if (nx < 0 || nx > 8 || ny < 0 || ny > 9) continue;
+          if (board[(y + d[1]) * 9 + x + d[0]] !== null) continue;
+          const q = board[ny * 9 + nx];
+          if (q === null || q[0] !== side) mob++;
+        }
+        v += W2.horseMob * mob;
+        if (x === 0 || x === 8) v -= W2.horseEdge;
+      } else if (t === 'C') {
+        majors++;
+        cannonSign += cho ? 1 : -1;
+        if (x === 4) v += W2.cannonCenter;
+      } else if (t === 'E') {
+        majors++;
+      } else if (t === 'P') {
+        if (x > 0 && board[i - 1] === p) v += W2.pawnLink;
+      } else if (t === 'A') {
+        if (cho) advC++; else advH++;
+      }
+
+      // 상대 궁성 근처(상대 끝 줄에서 네 줄 안, 2~6열)에 들어간 공격 기물
+      if (x >= 2 && x <= 6 && t !== 'K' && t !== 'A' && t !== 'E') {
+        const depthIn = cho ? y : 9 - y;
+        if (depthIn <= 3) v += t === 'P' ? W2.pawnIntruder : W2.intruder;
+      }
+
+      score += cho ? v : -v;
+    }
+
+    // 기물이 줄수록 포는 넘을 기물이 없어 약해진다
+    const phase = majors >= 16 ? 1 : majors / 16;
+    score -= cannonSign * W2.cannonEnd * (1 - phase);
+    const advPen = (n) => (n === 0 ? W2.noAdvisor : n === 1 ? W2.oneAdvisor : 0);
+    score += advPen(advH) - advPen(advC);
+    return score;
+  }
+
   // 기보 표기: 행(1~9, 0) + 열(1~9) + 기물 + 도착 행열. 예) 79졸78
   function squareName(i) {
     return String((yOf(i) + 1) % 10) + String(xOf(i) + 1);
@@ -444,7 +528,7 @@
     initialBoard, pseudoMoves, legalMoves, legalMovesFrom,
     makeMove, unmakeMove, findKing, inCheck, isAttacked,
     positionKey, nonRepeatingMoves, repetitionForbidden, passRepeats, gameOutcome,
-    materialScore, evaluate, notation, squareName,
+    materialScore, evaluate, evaluateV2, notation, squareName,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Janggi;

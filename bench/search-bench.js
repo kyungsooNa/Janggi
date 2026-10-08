@@ -27,7 +27,7 @@ let totalMs = 0;
 let totalNodes = 0;
 for (const [name, board, side] of positions()) {
   const t = Date.now();
-  const r = AI.findBestMove(board, side, { depth, timeMs: 1e9, quiesce: 6 });
+  const r = AI.findBestMove(board, side, { depth, timeMs: 1e9, quiesce: 6, evalVersion: Number(process.argv[3] || 1) });
   const ms = Date.now() - t;
   totalMs += ms;
   totalNodes += r.nodes;

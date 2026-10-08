@@ -13,9 +13,10 @@
 
   const MATE = 100000;
   const EPS = 0.001; // 점수가 소수라 널 윈도우 폭으로 쓴다
+  const LAZY_MARGIN = 5; // 위치 보너스가 기물 점수를 이 이상 바꾸지는 않는다고 본다
 
   const DEFAULT_PARAMS = {
-    depth: 3, timeMs: 1500, noise: 0, mistakeRate: 0, mistakeMargin: 0, quiesce: 6,
+    depth: 3, timeMs: 1500, noise: 0, mistakeRate: 0, mistakeMargin: 0, quiesce: 6, evalVersion: 1,
   };
 
   // ───────── Zobrist 해시 ─────────
@@ -59,8 +60,10 @@
 
   class Timeout extends Error {}
 
+  // params.evalVersion: 1 = 기물 점수 + 간단한 위치 보너스, 2 = 활동성·궁 안전 등을 더한 평가
+  let evaluateFn = J.evaluate;
   function scoreFor(board, side) {
-    const e = J.evaluate(board);
+    const e = evaluateFn(board);
     return side === J.CHO ? e : -e;
   }
 
@@ -169,6 +172,9 @@
       if (lostOnScore(side)) return -(MATE - ply);
       const moves = J.pseudoMoves(board, side);
       if (hasKingCapture(board, moves)) return MATE - ply;
+      // 게으른 평가: 기물 점수만으로도 beta 를 크게 넘으면 무거운 평가 없이 끝낸다
+      const rough = (side === J.CHO ? mat.c - mat.h : mat.h - mat.c);
+      if (rough - LAZY_MARGIN >= beta) return rough;
       const standPat = scoreFor(board, side);
       if (standPat >= beta || qdepth <= 0) return standPat;
       if (standPat > alpha) alpha = standPat;
@@ -311,11 +317,13 @@
     if (rootMoves.length === 0) return { move: null, score: 0, depth: 0, nodes: 0 };
     if (rootMoves.length === 1) return { move: rootMoves[0], score: 0, depth: 0, nodes: 0 };
 
-    // 정지 탐색 깊이가 다르면 저장된 점수의 의미가 달라지므로 치환표를 비운다
-    if (ttQuiesce !== params.quiesce) {
+    // 정지 탐색 깊이나 평가 방식이 다르면 저장된 점수의 의미가 달라지므로 치환표를 비운다
+    const ttKind = `${params.quiesce}/${params.evalVersion}`;
+    if (ttQuiesce !== ttKind) {
       clearTT();
-      ttQuiesce = params.quiesce;
+      ttQuiesce = ttKind;
     }
+    evaluateFn = params.evalVersion === 2 ? J.evaluateV2 : J.evaluate;
 
     // 무작위성을 섞는 실력대는 모든 후보의 정확한 점수가 필요하므로 창을 좁히지 않는다
     const exactRoot = params.noise > 0 || params.mistakeRate > 0;

@@ -232,3 +232,30 @@ test('AI: 장군이 아닌데 모든 수가 궁을 내주는 국면은 외통이
   const res = AI.findBestMove(b, 'h', { depth: 3, timeMs: 1e9, quiesce: 4 });
   assert.ok(res.score < AI.MATE / 2, `score ${res.score}`);
 });
+
+test('평가 v1·v2는 초·한을 뒤바꾸면 정확히 반대 값이 된다 (덤 제외)', () => {
+  // 진영을 바꾸고 위아래를 뒤집은 판: 초의 평가 + 뒤집은 판의 평가 = 덤 두 번(-3)
+  const mirror = (b) => {
+    const m = empty();
+    for (let i = 0; i < 90; i++) {
+      const p = b[i];
+      if (p) m[sq(J.xOf(i), 9 - J.yOf(i))] = (p[0] === 'c' ? 'h' : 'c') + p[1];
+    }
+    return m;
+  };
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let g = 0; g < 5; g++) {
+    const b = J.initialBoard('마상마상', '상마마상');
+    let side = 'c';
+    for (let ply = 0; ply < 40; ply++) {
+      const ms = J.legalMoves(b, side);
+      if (!ms.length) break;
+      J.makeMove(b, ms[Math.floor(rnd() * ms.length)]);
+      side = J.opponent(side);
+      for (const ev of [J.evaluate, J.evaluateV2]) {
+        assert.ok(Math.abs(ev(b) + ev(mirror(b)) + 2 * J.HAN_BONUS) < 1e-9);
+      }
+    }
+  }
+});
