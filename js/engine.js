@@ -15,7 +15,8 @@
   const CHO = 'c';
   const HAN = 'h';
   const HAN_BONUS = 1.5; // 후수인 한에게 주는 덤
-  const MIN_SCORE = 10;  // 남은 기물 점수가 이 점수 이하가 되면 패배
+  const MIN_SCORE = 10;  // 한쪽이 이 점수 이하일 때 양쪽이 연속으로 한수 쉼을 하면 기물 판정
+  const MOVE_HARD_LIMIT_EXTRA = 100; // 수 한도 뒤 잡기·장군으로 연장해도 이만큼 넘으면 무조건 판정
 
   const VALUE = { K: 0, R: 13, C: 7, H: 5, E: 3, A: 3, P: 2 };
 
@@ -366,22 +367,34 @@
     return (counts.get(positionKey(board, opponent(side))) || 0) >= (limit || 2);
   }
 
-  // 남은 기물 점수가 패배 기준(10점) 이하인가
+  // 남은 기물 점수가 기물 판정 기준(10점) 이하인가
   function belowMinScore(board, side) {
     return materialScore(board, side) <= MIN_SCORE;
   }
 
+  // 남은 기물 점수가 높은 쪽 (한의 덤 1.5 때문에 비기는 일은 없다)
+  function scoreLeader(board) {
+    return materialScore(board, CHO) > materialScore(board, HAN) ? CHO : HAN;
+  }
+
   /*
-   * 대국이 끝났는지 판정한다. side 는 이제 둘 차례인 쪽, legal 은 그 쪽의 합법수, plies 는 지금까지 둔 수.
-   * 순서: 점수 미달(10점 이하) → 외통 → 수 한도 점수 판정. 끝나지 않았으면 null.
+   * 대국이 끝났는지 판정한다 (카카오장기 방식). 끝나지 않았으면 null.
+   *   side  : 이제 둘 차례인 쪽,  legal : 그 쪽의 합법수,  plies : 지금까지 둔 수 (한수 쉼 포함)
+   *   ctx.bothPassed : 마지막 두 수가 양쪽의 연속 한수 쉼인가
+   *   ctx.lastActive : 마지막 수가 기물을 잡았거나 장군을 불렀는가
+   * 1) 외통
+   * 2) 기물승: 한쪽 점수가 10점 이하인데 양쪽이 연속으로 한수 쉼 → 점수 높은 쪽 승
+   * 3) 수 한도(200수): 점수 높은 쪽 승. 단 마지막 수가 잡기·장군이면 계속 두고,
+   *    한도를 100수 넘기면 무조건 판정한다.
    */
-  function gameOutcome(board, side, legal, plies, moveLimit) {
-    if (belowMinScore(board, side)) return { winner: opponent(side), reason: '점수 미달' };
+  function gameOutcome(board, side, legal, plies, moveLimit, ctx) {
+    const c = ctx || {};
     if (legal.length === 0 && inCheck(board, side)) return { winner: opponent(side), reason: '외통' };
-    if (plies >= moveLimit) {
-      const cho = materialScore(board, CHO);
-      const han = materialScore(board, HAN);
-      return { winner: cho > han ? CHO : HAN, reason: `${moveLimit}수 점수 판정` };
+    if (c.bothPassed && (belowMinScore(board, CHO) || belowMinScore(board, HAN))) {
+      return { winner: scoreLeader(board), reason: '기물' };
+    }
+    if (plies >= moveLimit && (!c.lastActive || plies >= moveLimit + MOVE_HARD_LIMIT_EXTRA)) {
+      return { winner: scoreLeader(board), reason: `${moveLimit}수 기물` };
     }
     return null;
   }
@@ -568,7 +581,7 @@
   }
 
   const Janggi = {
-    COLS, ROWS, CHO, HAN, VALUE, NAME, HANJA, SETUPS, HAN_BONUS, MIN_SCORE, belowMinScore,
+    COLS, ROWS, CHO, HAN, VALUE, NAME, HANJA, SETUPS, HAN_BONUS, MIN_SCORE, belowMinScore, scoreLeader,
     idx, xOf, yOf, inBoard, opponent, palaceOf, isDiagPoint,
     moveFrom, moveTo, makeMoveCode,
     initialBoard, pseudoMoves, legalMoves, legalMovesFrom,

@@ -225,20 +225,22 @@
     const wasCheck = g.checkSide;
     g.checkSide = check ? side : null;
 
-    // 점수 미달(10점 이하) → 외통 → 수 한도 순으로 판정한다 (엔진·대국 측정 스크립트와 같은 규칙)
-    const outcome = J.gameOutcome(g.board, side, legal, g.history.length, MOVE_LIMIT);
+    // 외통 → 기물승(10점 이하 + 연속 한수 쉼) → 200수 판정 (엔진·대국 측정 스크립트와 같은 규칙)
+    const outcome = J.gameOutcome(g.board, side, legal, g.history.length, MOVE_LIMIT, gameContext(check));
     if (outcome) {
       // 대국은 바로 끝내 더 두거나 무르지 못하게 하고, 결과 창만 알림을 본 뒤에 띄운다
-      const sudden = outcome.reason === '외통' || outcome.reason === '점수 미달';
-      if (sudden) showToast(outcome.reason === '외통' ? '외통!' : '점수 미달', 'check');
-      endGame(outcome.winner, outcome.reason, sudden ? 900 : 0);
+      const mate = outcome.reason === '외통';
+      showToast(mate ? '외통!' : `${outcome.winner === J.CHO ? '초' : '한'} 기물승`, mate ? 'check' : 'small');
+      endGame(outcome.winner, outcome.reason, 900);
       return;
     }
     if (check) showToast('장군!', 'check');
     else if (wasCheck && wasCheck !== side) showToast('멍군!', 'block');
     // 수 한도가 다가오면 미리 알려 준다 (장군 알림이 우선)
-    const left = MOVE_LIMIT - g.history.length;
+    const n = g.history.length;
+    const left = MOVE_LIMIT - n;
     if (!check && (left === 20 || left === 10)) showToast(`${MOVE_LIMIT}수까지 ${left}수 남음`, 'small');
+    else if (n >= MOVE_LIMIT && !check) showToast('잡거나 장군이라 계속 둡니다', 'small');
     render();
 
     if (legal.length === 0) {
@@ -249,7 +251,38 @@
     if (side === g.aiSide) requestAI(legal);
   }
 
+  // 판정에 쓰는 직전 수 정보: 양쪽이 연속으로 쉬었나, 마지막 수가 잡기·장군이었나
+  function gameContext(check) {
+    const h = g.history;
+    const last = h[h.length - 1];
+    const prev = h[h.length - 2];
+    return {
+      bothPassed: !!(last && prev && last.pass && prev.pass),
+      lastActive: !!(last && !last.pass && (last.captured || check)),
+    };
+  }
+
+  // 상대가 방금 쉬었고, 한쪽이 10점 이하라 나도 쉬면 기물승이 나는 상황에서 AI가 이기는 쪽이면 쉬어서 승부를 낸다
+  function aiShouldClaimByPass() {
+    const last = g.history[g.history.length - 1];
+    if (!last || !last.pass) return false;
+    if (!J.belowMinScore(g.board, J.CHO) && !J.belowMinScore(g.board, J.HAN)) return false;
+    if (J.inCheck(g.board, g.aiSide) || J.passRepeats(g.board, g.aiSide, g.positions)) return false;
+    return J.scoreLeader(g.board) === g.aiSide;
+  }
+
   function requestAI(legal) {
+    if (aiShouldClaimByPass()) {
+      g.thinking = true;
+      updateButtons();
+      const id = ++reqSeq;
+      setTimeout(() => {
+        if (id !== reqSeq || g.over) return;
+        g.thinking = false;
+        playPass();
+      }, 600);
+      return;
+    }
     const id = ++reqSeq;
     g.thinking = true;
     updateButtons();

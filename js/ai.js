@@ -106,7 +106,7 @@
     let nodes = 0;
     let h1 = 0;
     let h2 = 0;
-    // 남은 기물 점수 (덤 포함). 10점 이하가 되면 그 쪽이 지므로 수읽기 중에도 따라간다.
+    // 남은 기물 점수 (덤 포함). 정지 탐색의 게으른 평가에 쓴다.
     const mat = { c: 0, h: 0 };
     const killers = new Int32Array(128 * 2).fill(-1);
     const history = new Float64Array(PIECES.length * 90);
@@ -164,12 +164,8 @@
     }
     function flipSide() { h1 ^= SIDE1; h2 ^= SIDE2; }
 
-    // 둘 차례인 쪽의 점수가 10점 이하면 이미 진 국면이다 (외통과 같은 무게로 본다)
-    const lostOnScore = (side) => mat[side] <= J.MIN_SCORE;
-
     function quiesce(board, side, alpha, beta, qdepth, ply) {
       tick();
-      if (lostOnScore(side)) return -(MATE - ply);
       const moves = J.pseudoMoves(board, side);
       if (hasKingCapture(board, moves)) return MATE - ply;
       // 게으른 평가: 기물 점수만으로도 beta 를 크게 넘으면 무거운 평가 없이 끝낸다
@@ -198,7 +194,6 @@
     function negamax(board, side, depth, alpha, beta, ply, allowNull) {
       if (depth <= 0) return quiesce(board, side, alpha, beta, quiesceDepth, ply);
       tick();
-      if (lostOnScore(side)) return -(MATE - ply);
       const alphaOrig = alpha;
 
       // 치환표 조회

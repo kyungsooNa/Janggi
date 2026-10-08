@@ -192,7 +192,7 @@ test('AI는 반복수로 막힌 수를 두지 않는다', () => {
   assert.notEqual(res.move, capture);
 });
 
-test('점수 미달: 남은 기물 점수가 10점 이하면 패배 기준에 걸린다', () => {
+test('기물 판정 기준: 남은 기물 점수 10점 이하를 가린다', () => {
   // 궁 + 차(13) = 13점 → 통과, 궁 + 포(7) = 7점 → 미달
   const b = boardWith([['cR', 0, 9], ['hC', 0, 2]]);
   assert.equal(J.MIN_SCORE, 10);
@@ -205,16 +205,24 @@ test('점수 미달: 남은 기물 점수가 10점 이하면 패배 기준에 �
   assert.ok(J.belowMinScore(ten, 'c'));
 });
 
-test('AI는 상대를 10점 이하로 만드는 수를 찾는다', () => {
-  // 한: 궁 + 사(3) + 포(7) = 10 + 덤 1.5 = 11.5점. 사를 잡으면 8.5점이 되어 바로 이긴다.
-  const b = boardWith([['cR', 3, 9], ['hA', 3, 0], ['hC', 8, 2]]);
-  b[sq(4, 8)] = null;
-  b[sq(5, 8)] = 'cK';
-  const take = J.makeMoveCode(sq(3, 9), sq(3, 0));
-  assert.ok(J.legalMoves(b, 'c').includes(take));
-  const res = AI.findBestMove(b, 'c', R.aiParams(20));
-  assert.equal(res.move, take);
-  assert.ok(res.score > AI.MATE / 2);
+test('기물승(카장 방식): 10점 이하만으로는 끝나지 않고, 양쪽이 연속으로 쉬면 점수 높은 쪽이 이긴다', () => {
+  // 한: 궁 + 포(7) + 덤 1.5 = 8.5점, 초: 궁 + 차(13) = 13점
+  const b = boardWith([['cR', 0, 9], ['hC', 0, 2]]);
+  const legal = J.legalMoves(b, 'h');
+  assert.equal(J.gameOutcome(b, 'h', legal, 50, 200, { bothPassed: false }), null);
+  assert.deepEqual(J.gameOutcome(b, 'h', legal, 50, 200, { bothPassed: true }), { winner: 'c', reason: '기물' });
+  // 둘 다 10점을 넘으면 연속으로 쉬어도 계속 둔다
+  const start = J.initialBoard('마상마상', '마상마상');
+  assert.equal(J.gameOutcome(start, 'c', J.legalMoves(start, 'c'), 2, 200, { bothPassed: true }), null);
+});
+
+test('200수 판정: 마지막 수가 잡기·장군이면 연장하고, 300수에서는 무조건 판정한다', () => {
+  const b = J.initialBoard('마상마상', '마상마상');
+  const legal = J.legalMoves(b, 'c');
+  assert.equal(J.gameOutcome(b, 'c', legal, 199, 200, {}), null);
+  assert.deepEqual(J.gameOutcome(b, 'c', legal, 200, 200, {}), { winner: 'h', reason: '200수 기물' });
+  assert.equal(J.gameOutcome(b, 'c', legal, 200, 200, { lastActive: true }), null);
+  assert.ok(J.gameOutcome(b, 'c', legal, 300, 200, { lastActive: true }));
 });
 
 test('AI: 장군이 아닌데 모든 수가 궁을 내주는 국면은 외통이 아니라 한수 쉼으로 본다', () => {

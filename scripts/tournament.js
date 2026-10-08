@@ -1,8 +1,8 @@
 // 급수별 AI끼리 대국시켜 실제로 위 급수가 더 잘 두는지 잰다.
 //   node scripts/tournament.js                 기본: 8개 급수, 이웃 급수끼리 8판씩
 //   node scripts/tournament.js --games 4 --ranks 0,8,16,26 --workers 4 --out result.json
-// 게임 규칙은 화면과 같다: 반복수 금지, 장군 중이 아니면 둘 수 없을 때 한수 쉼, 200수 점수 판정,
-// 남은 기물 점수 10점 이하 패배.
+// 게임 규칙은 화면과 같다(카카오장기 방식): 반복수 금지(궁·사 제외), 둘 수 없으면 한수 쉼,
+// 10점 이하 + 연속 한수 쉼이면 기물 판정, 200수 기물 판정(잡기·장군이면 연장).
 const { Worker, isMainThread, parentPort } = require('worker_threads');
 const path = require('path');
 const fs = require('fs');
@@ -27,10 +27,13 @@ function playGame({ choParams, hanParams, choSetup, hanSetup, randomPlies = 0 })
   let turn = J.CHO;
   seen(turn);
   let plies = 0;
+  let passes = 0; // 연속 한수 쉼 수
+  let lastCapture = false;
   const started = Date.now();
   for (;;) {
     const legal = J.legalMoves(board, turn);
-    const outcome = J.gameOutcome(board, turn, legal, plies, MOVE_LIMIT);
+    const ctx = { bothPassed: passes >= 2, lastActive: lastCapture || J.inCheck(board, turn) };
+    const outcome = J.gameOutcome(board, turn, legal, plies, MOVE_LIMIT, ctx);
     if (outcome) {
       return { ...outcome, plies, ms: Date.now() - started, score: [J.materialScore(board, J.CHO), J.materialScore(board, J.HAN)] };
     }
@@ -40,7 +43,13 @@ function playGame({ choParams, hanParams, choSetup, hanSetup, randomPlies = 0 })
     if (!legal.length) res = { move: null };
     else if (plies < randomPlies) res = { move: legal[Math.floor(Math.random() * legal.length)] };
     else res = AI.findBestMove(board, turn, { ...params, forbidden });
-    if (res.move !== null) J.makeMove(board, res.move);
+    if (res.move !== null) {
+      lastCapture = !!J.makeMove(board, res.move);
+      passes = 0;
+    } else {
+      lastCapture = false;
+      passes++;
+    }
     turn = J.opponent(turn);
     plies++;
     seen(turn);
