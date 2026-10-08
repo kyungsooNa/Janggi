@@ -226,11 +226,13 @@
     g.checkSide = check ? side : null;
 
     // 외통 → 기물승(10점 이하 + 연속 한수 쉼) → 200수 판정 (엔진·대국 측정 스크립트와 같은 규칙)
-    const outcome = J.gameOutcome(g.board, side, legal, g.history.length, MOVE_LIMIT, gameContext(check));
+    const ctx = gameContext(check);
+    const outcome = J.gameOutcome(g.board, side, legal, g.history.length, MOVE_LIMIT, ctx);
     if (outcome) {
       // 대국은 바로 끝내 더 두거나 무르지 못하게 하고, 결과 창만 알림을 본 뒤에 띄운다
       const mate = outcome.reason === '외통';
-      showToast(mate ? '외통!' : `${outcome.winner === J.CHO ? '초' : '한'} 기물승`, mate ? 'check' : 'small');
+      const who = outcome.winner === J.CHO ? '초' : '한';
+      showToast(mate ? '외통!' : ctx.noMate ? `외통 불가 · ${who} 기물승` : `${who} 기물승`, mate ? 'check' : 'small');
       endGame(outcome.winner, outcome.reason, 900);
       return;
     }
@@ -259,6 +261,8 @@
     return {
       bothPassed: !!(last && prev && last.pass && prev.pass),
       lastActive: !!(last && !last.pass && (last.captured || check)),
+      // 양쪽 모두 약한 기물만 남았을 때만 AI 로 외통 여부를 확인한다 (그 전에는 기물 수만 세고 끝)
+      noMate: window.JanggiAI.noMatePossible(g.board),
     };
   }
 

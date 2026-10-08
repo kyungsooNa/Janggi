@@ -32,7 +32,11 @@ function playGame({ choParams, hanParams, choSetup, hanSetup, randomPlies = 0 })
   const started = Date.now();
   for (;;) {
     const legal = J.legalMoves(board, turn);
-    const ctx = { bothPassed: passes >= 2, lastActive: lastCapture || J.inCheck(board, turn) };
+    const ctx = {
+      bothPassed: passes >= 2,
+      lastActive: lastCapture || J.inCheck(board, turn),
+      noMate: AI.noMatePossible(board),
+    };
     const outcome = J.gameOutcome(board, turn, legal, plies, MOVE_LIMIT, ctx);
     if (outcome) {
       return { ...outcome, plies, ms: Date.now() - started, score: [J.materialScore(board, J.CHO), J.materialScore(board, J.HAN)] };

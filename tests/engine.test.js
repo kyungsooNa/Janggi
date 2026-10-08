@@ -286,3 +286,29 @@ test('반복수: 궁과 사가 움직이는 수는 반복돼도 막지 않는다
   assert.ok(allowed.includes(advisorMove));
   assert.ok(!allowed.includes(rookMove));
 });
+
+test('외통 불가 기물승: 양쪽 다 포·졸만 조금 남아 서로 외통을 못 내면 점수로 끝낸다', () => {
+  // 145수 실제 대국 국면: 초 궁·사·포·졸(12점) vs 한 궁·사·사·포·병(16.5점)
+  const b = empty();
+  for (const [p, x, y] of [['cK', 3, 9], ['cA', 3, 8], ['hP', 5, 8], ['cC', 2, 2], ['cP', 0, 0],
+    ['hA', 4, 1], ['hA', 3, 1], ['hK', 5, 0], ['hC', 4, 0]]) b[sq(x, y)] = p;
+  assert.ok(J.weakAttack(b, 'c') && J.weakAttack(b, 'h'));
+  assert.ok(AI.noMatePossible(b));
+  const out = J.gameOutcome(b, 'h', J.legalMoves(b, 'h'), 145, 200, { noMate: true });
+  assert.deepEqual(out, { winner: 'h', reason: '기물' });
+  // 차가 남아 있으면 해당하지 않는다
+  b[sq(0, 9)] = 'cR';
+  assert.ok(!J.weakAttack(b, 'c'));
+  assert.ok(!AI.noMatePossible(b));
+});
+
+test('외통 불가 판정은 실제로 외통이 있는 국면은 끝내지 않는다', () => {
+  // 졸 둘로 궁만 남은 한을 몇 수 안에 외통 내는 국면 (무작위 국면 실험에서 찾은 것)
+  const b = empty();
+  for (const [p, x, y] of [['hK', 3, 0], ['cP', 5, 1], ['cP', 3, 2], ['cK', 5, 8]]) b[sq(x, y)] = p;
+  assert.ok(!J.inCheck(b, 'h'));
+  assert.ok(J.weakAttack(b, 'c') && J.weakAttack(b, 'h'));
+  const r = AI.findBestMove(b, 'c', { depth: 4, timeMs: 5000, quiesce: 4, nullMove: false, lmr: false });
+  assert.ok(r.score > AI.MATE / 2); // 외통이 있다
+  assert.ok(!AI.noMatePossible(b)); // 그러니 점수로 끝내지 않는다
+});

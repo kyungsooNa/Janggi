@@ -372,6 +372,22 @@
     return materialScore(board, side) <= MIN_SCORE;
   }
 
+  /*
+   * 외통을 만들기 어려운 기물만 남았는가: 차·마·상이 없고 포+졸이 2개 이하.
+   * (무작위 국면 실험에서 이 조합의 외통은 0~3% 뿐이었다. 실제 판정 전에는 AI 로 외통 여부를 한 번 더 확인한다.)
+   */
+  function weakAttack(board, side) {
+    let cp = 0;
+    for (let i = 0; i < 90; i++) {
+      const p = board[i];
+      if (!p || p[0] !== side) continue;
+      const t = p[1];
+      if (t === 'R' || t === 'H' || t === 'E') return false;
+      if (t === 'C' || t === 'P') cp++;
+    }
+    return cp <= 2;
+  }
+
   // 남은 기물 점수가 높은 쪽 (한의 덤 1.5 때문에 비기는 일은 없다)
   function scoreLeader(board) {
     return materialScore(board, CHO) > materialScore(board, HAN) ? CHO : HAN;
@@ -382,14 +398,17 @@
    *   side  : 이제 둘 차례인 쪽,  legal : 그 쪽의 합법수,  plies : 지금까지 둔 수 (한수 쉼 포함)
    *   ctx.bothPassed : 마지막 두 수가 양쪽의 연속 한수 쉼인가
    *   ctx.lastActive : 마지막 수가 기물을 잡았거나 장군을 불렀는가
+   *   ctx.noMate     : 양쪽 모두 외통을 만들 수 없는 기물만 남았는가 (weakAttack + AI 확인)
    * 1) 외통
-   * 2) 기물승: 한쪽 점수가 10점 이하인데 양쪽이 연속으로 한수 쉼 → 점수 높은 쪽 승
+   * 2) 기물승: 서로 외통을 낼 수 없는 기물만 남았거나,
+   *    한쪽 점수가 10점 이하인데 양쪽이 연속으로 한수 쉼 → 점수 높은 쪽 승
    * 3) 수 한도(200수): 점수 높은 쪽 승. 단 마지막 수가 잡기·장군이면 계속 두고,
    *    한도를 100수 넘기면 무조건 판정한다.
    */
   function gameOutcome(board, side, legal, plies, moveLimit, ctx) {
     const c = ctx || {};
     if (legal.length === 0 && inCheck(board, side)) return { winner: opponent(side), reason: '외통' };
+    if (c.noMate) return { winner: scoreLeader(board), reason: '기물' };
     if (c.bothPassed && (belowMinScore(board, CHO) || belowMinScore(board, HAN))) {
       return { winner: scoreLeader(board), reason: '기물' };
     }
@@ -581,7 +600,7 @@
   }
 
   const Janggi = {
-    COLS, ROWS, CHO, HAN, VALUE, NAME, HANJA, SETUPS, HAN_BONUS, MIN_SCORE, belowMinScore, scoreLeader,
+    COLS, ROWS, CHO, HAN, VALUE, NAME, HANJA, SETUPS, HAN_BONUS, MIN_SCORE, belowMinScore, scoreLeader, weakAttack,
     idx, xOf, yOf, inBoard, opponent, palaceOf, isDiagPoint,
     moveFrom, moveTo, makeMoveCode,
     initialBoard, pseudoMoves, legalMoves, legalMovesFrom,

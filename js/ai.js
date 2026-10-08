@@ -421,7 +421,21 @@
     return { move: bestMove, score: bestScore, depth: completedDepth, nodes: search.getNodes() };
   }
 
-  const JanggiAI = { findBestMove, MATE, clearTT };
+  /*
+   * 서로 외통을 낼 수 없는 판인가: 양쪽 모두 약한 기물만 남았고(J.weakAttack),
+   * 어느 쪽이 둘 차례라고 쳐도 depth 수 안에 외통이 없다. 기물이 적은 국면이라 빠르다.
+   */
+  function noMatePossible(board, depth) {
+    if (!J.weakAttack(board, J.CHO) || !J.weakAttack(board, J.HAN)) return false;
+    const params = { depth: depth || 6, timeMs: 2000, quiesce: 4, evalVersion: 2, nullMove: false, lmr: false };
+    for (const side of [J.CHO, J.HAN]) {
+      const r = findBestMove(board, side, params);
+      if (r.score > MATE / 2) return false;
+    }
+    return true;
+  }
+
+  const JanggiAI = { findBestMove, MATE, clearTT, noMatePossible };
   if (typeof module !== 'undefined' && module.exports) module.exports = JanggiAI;
   global.JanggiAI = JanggiAI;
 })(typeof self !== 'undefined' ? self : this);
