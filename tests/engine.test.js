@@ -125,6 +125,8 @@ test('AI는 한 수 외통을 놓치지 않는다 (9단)', () => {
   b[sq(3, 7)] = 'hR';
   b[sq(5, 7)] = 'hR';
   b[sq(4, 3)] = 'hR';
+  // 초가 점수 미달(10점 이하)로 이미 진 국면이 되지 않도록 멀리 졸 셋을 둔다 (6 + 6 = 12점)
+  for (const x of [0, 1, 8]) b[sq(x, 0)] = 'cP';
   const res = AI.findBestMove(b, 'h', R.aiParams(26));
   const after = b.slice();
   J.makeMove(after, res.move);
@@ -201,4 +203,16 @@ test('점수 미달: 남은 기물 점수가 10점 이하면 패배 기준에 �
   const ten = boardWith([['cA', 3, 9], ['cC', 1, 7]]);
   assert.equal(J.materialScore(ten, 'c'), 10);
   assert.ok(J.belowMinScore(ten, 'c'));
+});
+
+test('AI는 상대를 10점 이하로 만드는 수를 찾는다', () => {
+  // 한: 궁 + 사(3) + 포(7) = 10 + 덤 1.5 = 11.5점. 사를 잡으면 8.5점이 되어 바로 이긴다.
+  const b = boardWith([['cR', 3, 9], ['hA', 3, 0], ['hC', 8, 2]]);
+  b[sq(4, 8)] = null;
+  b[sq(5, 8)] = 'cK';
+  const take = J.makeMoveCode(sq(3, 9), sq(3, 0));
+  assert.ok(J.legalMoves(b, 'c').includes(take));
+  const res = AI.findBestMove(b, 'c', R.aiParams(20));
+  assert.equal(res.move, take);
+  assert.ok(res.score > AI.MATE / 2);
 });

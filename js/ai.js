@@ -103,6 +103,8 @@
     let nodes = 0;
     let h1 = 0;
     let h2 = 0;
+    // 남은 기물 점수 (덤 포함). 10점 이하가 되면 그 쪽이 지므로 수읽기 중에도 따라간다.
+    const mat = { c: 0, h: 0 };
     const killers = new Int32Array(128 * 2).fill(-1);
     const history = new Float64Array(PIECES.length * 90);
 
@@ -118,6 +120,8 @@
         if (p) { h1 ^= Z1[PIDX[p] * 90 + i]; h2 ^= Z2[PIDX[p] * 90 + i]; }
       }
       if (side === J.HAN) { h1 ^= SIDE1; h2 ^= SIDE2; }
+      mat.c = J.materialScore(board, J.CHO);
+      mat.h = J.materialScore(board, J.HAN);
     }
 
     // 해시를 함께 갱신하는 수 두기/무르기
@@ -133,6 +137,7 @@
         const ci = PIDX[cap] * 90 + to;
         h1 ^= Z1[ci];
         h2 ^= Z2[ci];
+        mat[cap[0]] -= J.VALUE[cap[1]];
       }
       board[to] = p;
       board[from] = null;
@@ -149,14 +154,19 @@
         const ci = PIDX[cap] * 90 + to;
         h1 ^= Z1[ci];
         h2 ^= Z2[ci];
+        mat[cap[0]] += J.VALUE[cap[1]];
       }
       board[from] = p;
       board[to] = cap;
     }
     function flipSide() { h1 ^= SIDE1; h2 ^= SIDE2; }
 
+    // 둘 차례인 쪽의 점수가 10점 이하면 이미 진 국면이다 (외통과 같은 무게로 본다)
+    const lostOnScore = (side) => mat[side] <= J.MIN_SCORE;
+
     function quiesce(board, side, alpha, beta, qdepth, ply) {
       tick();
+      if (lostOnScore(side)) return -(MATE - ply);
       const moves = J.pseudoMoves(board, side);
       if (hasKingCapture(board, moves)) return MATE - ply;
       const standPat = scoreFor(board, side);
@@ -170,9 +180,9 @@
       }
       for (let i = 0; i < caps.length; i++) {
         const m = pickNext(caps, scores, i);
-        const cap = J.makeMove(board, m);
+        const cap = make(board, m);
         const score = -quiesce(board, J.opponent(side), -beta, -alpha, qdepth - 1, ply + 1);
-        J.unmakeMove(board, m, cap);
+        unmake(board, m, cap);
         if (score >= beta) return score;
         if (score > alpha) alpha = score;
       }
@@ -182,6 +192,7 @@
     function negamax(board, side, depth, alpha, beta, ply, allowNull) {
       if (depth <= 0) return quiesce(board, side, alpha, beta, quiesceDepth, ply);
       tick();
+      if (lostOnScore(side)) return -(MATE - ply);
       const alphaOrig = alpha;
 
       // 치환표 조회
