@@ -350,6 +350,14 @@
     });
   }
 
+  // 반복수로 둘 수 없는 수 목록. 그것까지 빼면 둘 수가 없을 때는 아무것도 막지 않는다.
+  function repetitionForbidden(board, side, legal, counts) {
+    const ok = nonRepeatingMoves(board, side, legal, counts);
+    if (ok.length === 0) return [];
+    const okSet = new Set(ok);
+    return legal.filter((m) => !okSet.has(m));
+  }
+
   // 한수 쉼이 반복수가 되는가
   function passRepeats(board, side, counts, limit) {
     return (counts.get(positionKey(board, opponent(side))) || 0) >= (limit || 2);
@@ -358,6 +366,21 @@
   // 남은 기물 점수가 패배 기준(10점) 이하인가
   function belowMinScore(board, side) {
     return materialScore(board, side) <= MIN_SCORE;
+  }
+
+  /*
+   * 대국이 끝났는지 판정한다. side 는 이제 둘 차례인 쪽, legal 은 그 쪽의 합법수, plies 는 지금까지 둔 수.
+   * 순서: 점수 미달(10점 이하) → 외통 → 수 한도 점수 판정. 끝나지 않았으면 null.
+   */
+  function gameOutcome(board, side, legal, plies, moveLimit) {
+    if (belowMinScore(board, side)) return { winner: opponent(side), reason: '점수 미달' };
+    if (legal.length === 0 && inCheck(board, side)) return { winner: opponent(side), reason: '외통' };
+    if (plies >= moveLimit) {
+      const cho = materialScore(board, CHO);
+      const han = materialScore(board, HAN);
+      return { winner: cho > han ? CHO : HAN, reason: `${moveLimit}수 점수 판정` };
+    }
+    return null;
   }
 
   // 남은 기물 점수 (한은 덤 포함)
@@ -420,7 +443,7 @@
     moveFrom, moveTo, makeMoveCode,
     initialBoard, pseudoMoves, legalMoves, legalMovesFrom,
     makeMove, unmakeMove, findKing, inCheck, isAttacked,
-    positionKey, nonRepeatingMoves, passRepeats,
+    positionKey, nonRepeatingMoves, repetitionForbidden, passRepeats, gameOutcome,
     materialScore, evaluate, notation, squareName,
   };
 

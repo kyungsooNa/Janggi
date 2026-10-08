@@ -3,7 +3,7 @@
 //   node scripts/tournament.js --games 4 --ranks 0,8,16,26 --workers 4 --out result.json
 // 게임 규칙은 화면과 같다: 반복수 금지, 장군 중이 아니면 둘 수 없을 때 한수 쉼, 200수 점수 판정,
 // 남은 기물 점수 10점 이하 패배.
-const { Worker, isMainThread, parentPort, workerData } = require('worker_threads');
+const { Worker, isMainThread, parentPort } = require('worker_threads');
 const path = require('path');
 const fs = require('fs');
 
@@ -14,7 +14,9 @@ const R = require('../js/ranks.js');
 const MOVE_LIMIT = 200;
 const SETUPS = Object.keys(J.SETUPS);
 
-function playGame({ choRank, hanRank, choSetup, hanSetup }) {
+// 한 판을 끝까지 둔다. choParams / hanParams 는 findBestMove 에 넘길 AI 설정.
+// 승패 판정은 화면(main.js)과 같은 J.gameOutcome · J.repetitionForbidden 을 쓴다.
+function playGame({ choParams, hanParams, choSetup, hanSetup }) {
   const board = J.initialBoard(choSetup, hanSetup);
   const counts = new Map();
   const seen = (side) => {
@@ -26,22 +28,14 @@ function playGame({ choRank, hanRank, choSetup, hanSetup }) {
   let plies = 0;
   const started = Date.now();
   for (;;) {
-    if (J.belowMinScore(board, turn)) {
-      return { winner: J.opponent(turn), reason: '점수 미달', plies, ms: Date.now() - started };
-    }
     const legal = J.legalMoves(board, turn);
-    if (legal.length === 0 && J.inCheck(board, turn)) {
-      return { winner: J.opponent(turn), reason: '외통', plies, ms: Date.now() - started };
+    const outcome = J.gameOutcome(board, turn, legal, plies, MOVE_LIMIT);
+    if (outcome) {
+      return { ...outcome, plies, ms: Date.now() - started, score: [J.materialScore(board, J.CHO), J.materialScore(board, J.HAN)] };
     }
-    if (plies >= MOVE_LIMIT) {
-      const c = J.materialScore(board, J.CHO);
-      const h = J.materialScore(board, J.HAN);
-      return { winner: c > h ? J.CHO : J.HAN, reason: '점수', plies, ms: Date.now() - started, score: [c, h] };
-    }
-    const ok = J.nonRepeatingMoves(board, turn, legal, counts);
-    const forbidden = ok.length ? legal.filter((m) => !ok.includes(m)) : [];
-    const rank = turn === J.CHO ? choRank : hanRank;
-    const res = legal.length ? AI.findBestMove(board, turn, { ...R.aiParams(rank), forbidden }) : { move: null };
+    const forbidden = J.repetitionForbidden(board, turn, legal, counts);
+    const params = turn === J.CHO ? choParams : hanParams;
+    const res = legal.length ? AI.findBestMove(board, turn, { ...params, forbidden }) : { move: null };
     if (res.move !== null) J.makeMove(board, res.move);
     turn = J.opponent(turn);
     plies++;
@@ -49,10 +43,13 @@ function playGame({ choRank, hanRank, choSetup, hanSetup }) {
   }
 }
 
+module.exports = { playGame };
+
 if (!isMainThread) {
   parentPort.on('message', (job) => parentPort.postMessage({ ...job, ...playGame(job) }));
   return;
 }
+if (require.main !== module) return;
 
 const arg = (name, def) => {
   const i = process.argv.indexOf(`--${name}`);
@@ -75,6 +72,8 @@ for (let k = 0; k + 1 < ranks.length; k++) {
       low, high,
       choRank: highIsCho ? high : low,
       hanRank: highIsCho ? low : high,
+      choParams: R.aiParams(highIsCho ? high : low),
+      hanParams: R.aiParams(highIsCho ? low : high),
       choSetup: SETUPS[Math.floor(Math.random() * 4)],
       hanSetup: SETUPS[Math.floor(Math.random() * 4)],
     });

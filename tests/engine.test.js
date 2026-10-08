@@ -216,3 +216,19 @@ test('AI는 상대를 10점 이하로 만드는 수를 찾는다', () => {
   assert.equal(res.move, take);
   assert.ok(res.score > AI.MATE / 2);
 });
+
+test('AI: 장군이 아닌데 모든 수가 궁을 내주는 국면은 외통이 아니라 한수 쉼으로 본다', () => {
+  // 초: 궁(4,9) + 맨 윗줄을 꽉 채운 졸 9개(서로 막혀 못 움직임, 18점). 궁이 갈 곳은 한의 차가 모두 노린다.
+  const b = empty();
+  b[sq(4, 9)] = 'cK';
+  for (let x = 0; x < 9; x++) b[sq(x, 0)] = 'cP';
+  b[sq(4, 1)] = 'hK';
+  b[sq(3, 5)] = 'hR';
+  b[sq(5, 5)] = 'hR';
+  b[sq(0, 8)] = 'hR';
+  assert.ok(!J.inCheck(b, 'c'));
+  assert.equal(J.legalMoves(b, 'c').length, 0); // 실제 대국에서는 한수 쉼
+  // 한이 두는 수를 읽을 때 "다음 초 차례는 외통"이라고 잘못 보면 점수가 외통 점수로 튄다
+  const res = AI.findBestMove(b, 'h', { depth: 3, timeMs: 1e9, quiesce: 4 });
+  assert.ok(res.score < AI.MATE / 2, `score ${res.score}`);
+});

@@ -238,6 +238,9 @@
 
       let best = -Infinity;
       let bestMove = -1;
+      // 모든 수가 바로 궁을 내주는가 (그런데 장군이 아니면 외통이 아니라 한수 쉼을 해야 한다)
+      const kingLost = -(MATE - (ply + 1));
+      let allLoseKing = true;
       for (let i = 0; i < moves.length; i++) {
         const m = pickNext(moves, scores, i);
         const quiet = !board[m & 127] && m !== k0 && m !== k1;
@@ -253,6 +256,7 @@
           if (score > alpha && score < beta) score = -negamax(board, opp, depth - 1, -beta, -alpha, ply + 1, true);
         }
         unmake(board, m, cap);
+        if (score !== kingLost) allLoseKing = false;
         if (score > best) { best = score; bestMove = m; }
         if (score > alpha) alpha = score;
         if (alpha >= beta) {
@@ -267,8 +271,9 @@
         }
       }
 
-      // 둘 수 있는 수가 전혀 없으면 한수 쉼
-      if (best === -Infinity) {
+      // 둘 수 있는 수가 전혀 없거나, 장군이 아닌데 모든 수가 궁을 내주면 한수 쉼
+      if (best === -Infinity || (allLoseKing && !J.inCheck(board, side))) {
+        bestMove = -1;
         flipSide();
         best = -negamax(board, opp, depth - 1, -beta, -alpha, ply + 1, false);
         flipSide();
@@ -329,6 +334,8 @@
       let iterBest = null;
       let iterScore = -Infinity;
       const iterScored = [];
+      // null 창 탐색으로 지금 최선보다 낫다고 확인됐지만 정확한 점수를 다시 읽는 중인 수
+      let provenBetter = null;
       try {
         let alpha = -Infinity;
         for (let i = 0; i < order.length; i++) {
@@ -340,7 +347,11 @@
               score = -search.negamax(board, opp, depth - 1, -Infinity, exactRoot ? Infinity : -alpha, 1, true);
             } else {
               score = -search.negamax(board, opp, depth - 1, -alpha - EPS, -alpha, 1, true);
-              if (score > alpha) score = -search.negamax(board, opp, depth - 1, -Infinity, -alpha, 1, true);
+              if (score > alpha) {
+                provenBetter = m;
+                score = -search.negamax(board, opp, depth - 1, -Infinity, -alpha, 1, true);
+                provenBetter = null;
+              }
             }
           } finally {
             search.unmake(board, m, cap);
@@ -357,7 +368,10 @@
         // 시간이 다 돼 이번 깊이를 끝내지 못했어도, 다 읽은 후보 중 지난 깊이의 최선보다
         // 나은 수가 있으면 그 수를 쓴다 (첫 후보는 지난 깊이의 최선 수다).
         // 무작위를 섞는 실력대는 모든 후보 점수가 필요하므로 지난 깊이 결과를 그대로 쓴다.
-        if (!exactRoot && iterBest !== null && iterBest !== bestMove && iterScore > -MATE / 2) {
+        if (!exactRoot && provenBetter !== null) {
+          bestMove = provenBetter;
+          bestScore = Math.max(bestScore, iterScore);
+        } else if (!exactRoot && iterBest !== null && iterBest !== bestMove && iterScore > -MATE / 2) {
           bestMove = iterBest;
           bestScore = iterScore;
         }

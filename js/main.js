@@ -176,12 +176,8 @@
   }
 
   // 반복수로 둘 수 없는 수 목록. 그것까지 빼면 둘 수가 없을 때는 막지 않는다.
-  function forbiddenMoves(side) {
-    const legal = J.legalMoves(g.board, side);
-    const ok = J.nonRepeatingMoves(g.board, side, legal, g.positions);
-    if (ok.length === 0) return [];
-    const okSet = new Set(ok);
-    return legal.filter((m) => !okSet.has(m));
+  function forbiddenMoves(side, legal) {
+    return J.repetitionForbidden(g.board, side, legal || J.legalMoves(g.board, side), g.positions);
   }
 
   // ───────────── 수 두기 ─────────────
@@ -229,28 +225,17 @@
     const wasCheck = g.checkSide;
     g.checkSide = check ? side : null;
 
-    // 남은 기물 점수가 기준 미만이면 그 쪽이 바로 진다
-    if (J.belowMinScore(g.board, side)) {
-      render();
-      showToast('점수 미달', 'check');
-      setTimeout(() => endGame(J.opponent(side), '점수 미달'), 900);
-      return;
-    }
-    if (check && legal.length === 0) {
-      render();
-      showToast('외통!', 'check');
-      setTimeout(() => endGame(J.opponent(side), '외통'), 900);
+    // 점수 미달(10점 이하) → 외통 → 수 한도 순으로 판정한다 (엔진·대국 측정 스크립트와 같은 규칙)
+    const outcome = J.gameOutcome(g.board, side, legal, g.history.length, MOVE_LIMIT);
+    if (outcome) {
+      // 대국은 바로 끝내 더 두거나 무르지 못하게 하고, 결과 창만 알림을 본 뒤에 띄운다
+      const sudden = outcome.reason === '외통' || outcome.reason === '점수 미달';
+      if (sudden) showToast(outcome.reason === '외통' ? '외통!' : '점수 미달', 'check');
+      endGame(outcome.winner, outcome.reason, sudden ? 900 : 0);
       return;
     }
     if (check) showToast('장군!', 'check');
     else if (wasCheck && wasCheck !== side) showToast('멍군!', 'block');
-
-    if (g.history.length >= MOVE_LIMIT) {
-      const my = J.materialScore(g.board, g.mySide);
-      const op = J.materialScore(g.board, g.aiSide);
-      endGame(my > op ? g.mySide : g.aiSide, `${MOVE_LIMIT}수 점수 판정`);
-      return;
-    }
     // 수 한도가 다가오면 미리 알려 준다 (장군 알림이 우선)
     const left = MOVE_LIMIT - g.history.length;
     if (!check && (left === 20 || left === 10)) showToast(`${MOVE_LIMIT}수까지 ${left}수 남음`, 'small');
@@ -261,16 +246,16 @@
       setTimeout(() => { if (!g.over && g.turn === side) playPass(); }, 700);
       return;
     }
-    if (side === g.aiSide) requestAI();
+    if (side === g.aiSide) requestAI(legal);
   }
 
-  function requestAI() {
+  function requestAI(legal) {
     const id = ++reqSeq;
     g.thinking = true;
     updateButtons();
     const started = Date.now();
     const think = 250 + Math.random() * 450; // 너무 빨리 두면 어색하므로 최소 생각 시간
-    const params = { ...R.aiParams(g.oppRank), forbidden: forbiddenMoves(g.aiSide) };
+    const params = { ...R.aiParams(g.oppRank), forbidden: forbiddenMoves(g.aiSide, legal) };
     runAI(g.board, g.aiSide, params, (res) => {
       if (id !== reqSeq || g.over) return;
       const wait = Math.max(0, think - (Date.now() - started));
@@ -283,7 +268,7 @@
     });
   }
 
-  function endGame(winner, reason) {
+  function endGame(winner, reason, dialogDelay) {
     if (g.over) return;
     g.over = true;
     g.thinking = false;
@@ -309,7 +294,10 @@
       moves: g.history.map((h) => (h.pass ? -1 : h.m)),
     });
     render();
-    showResultDialog(won, reason, before, res.change);
+    const game = g;
+    const show = () => { if (g === game) showResultDialog(won, reason, before, res.change); };
+    if (dialogDelay) setTimeout(show, dialogDelay);
+    else show();
   }
 
   // ───────────── 입력 ─────────────
@@ -658,7 +646,7 @@
 
   function enterView(ply) {
     if (!g || !g.started) return;
-    cancelFlight();
+    cancelFlight(true);
     g.selected = -1;
     g.targets = [];
     g.repeatTargets = [];
@@ -1012,7 +1000,7 @@
     const dur = quick ? 1 : Math.min(240, 130 + dist * 14);
     const lift = 4 + Math.min(8, dist * 1.5);
     const token = {};
-    g.flying = { to, token, timers: [] };
+    g.flying = { to, token, timers: [], onLand };
 
     if (captured) fx.insertAdjacentHTML('beforeend', `<g class="piece victim" style="transform:translate(${x2}px,${y2}px)">${pieceShape(captured, RADIUS[captured[1]])}</g>`);
     fx.insertAdjacentHTML('beforeend', `<g class="piece flying" style="transform:translate(${x1}px,${y1}px)">${pieceShape(piece, r)}</g>`);
@@ -1074,10 +1062,13 @@
     }, dur));
   }
 
-  function cancelFlight() {
+  // finish 가 참이면 연출만 건너뛰고 착지 뒤 처리(장군 판정, 상대 차례 넘기기)는 바로 실행한다
+  function cancelFlight(finish) {
     if (g && g.flying) {
-      g.flying.timers.forEach(clearTimeout);
+      const { timers, onLand } = g.flying;
+      timers.forEach(clearTimeout);
       g.flying = null;
+      if (finish && onLand) onLand();
     }
     const fx = $('fx');
     if (fx) fx.innerHTML = '';
