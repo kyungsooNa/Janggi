@@ -26,29 +26,37 @@
    *   quiesce      : 정지 탐색 깊이 (0이면 수읽기 끝에서 맞교환을 보지 못한다)
    *   evalVersion  : 국면 평가 방식 (js/engine.js 의 evaluate / evaluateV2)
    */
-  // 급수별 최대 탐색 깊이 (18급 → 9단). 단 구간은 한 단계마다 한 수씩 더 깊이 읽게 나눴다.
+  // 급수별 최대 탐색 깊이 (18급 → 9단). 구간마다 한 수씩 더 깊이 읽는다.
   const DEPTH = [
-    1, 1, 1, 1, //  18급 ~ 15급
-    2, 2, 2, 2, 2, // 14급 ~ 10급
-    3, 3, 3, 3, 3, //  9급 ~ 5급
-    4, 4, 4, 4, //  4급 ~ 1급
-    5, 5, 5, //  1단 ~ 3단
-    6, 6, 6, //  4단 ~ 6단
-    7, 7, //  7단 ~ 8단
-    8, //  9단
+    2, 2, 2, 2, //  18급 ~ 15급
+    3, 3, 3, 3, 3, // 14급 ~ 10급
+    4, 4, 4, 4, 4, //  9급 ~ 5급
+    5, 5, 5, 5, //  4급 ~ 1급
+    6, 6, 6, //  1단 ~ 3단
+    7, 7, 7, //  4단 ~ 6단
+    8, 8, //  7단 ~ 8단
+    9, //  9단
   ];
 
   function aiParams(index) {
     const s = Math.max(0, Math.min(RANKS.length - 1, index)); // 0 = 18급, 26 = 9단
+    // 실수는 급이 낮을수록 잦지만, 실수해도 최선 수보다 조금만 나쁜 수를 고른다.
+    // 9급부터는 손해 폭이 1점 안팎이라 기물(상·사 3점 이상)을 거저 내주지 않는다.
+    let noise;
+    let margin;
+    if (s < 4) { noise = 1.5; margin = 3; } //      18~15급: 초보
+    else if (s < 9) { noise = 0.8; margin = 1.8; } // 14~10급
+    else if (s < 14) { noise = 0.4; margin = 1.0; } // 9~5급
+    else if (s < 18) { noise = 0.2; margin = 0.6; } // 4~1급
+    else { noise = 0; margin = 0; } //               단: 실수하지 않는다
     return {
       depth: DEPTH[s],
-      timeMs: Math.round(300 + s * 180),
-      // 급 구간은 일부러 흔들리고 실수하며, 1~3단은 가끔만 실수하고, 4단부터는 실수하지 않는다
-      noise: s < 18 ? Math.max(0, 3.2 - s * 0.18) : 0,
-      mistakeRate: s < 21 ? Math.max(0, 0.4 - s * 0.019) : 0,
-      mistakeMargin: Math.max(0.5, 7 - s * 0.3),
-      quiesce: s < 2 ? 0 : s < 6 ? 2 : s < 12 ? 4 : 6,
-      // 평가 v2(활동성·궁 안전 포함)는 같은 생각 시간에서 v1 을 67% 이겼다 (bench/ab-eval.js)
+      timeMs: Math.round(400 + s * 200),
+      noise,
+      mistakeRate: s < 18 ? Math.max(0.02, 0.3 - s * 0.0165) : 0,
+      mistakeMargin: margin,
+      quiesce: s < 2 ? 2 : 6,
+      // 평가 v2(활동성·궁 안전 포함)는 같은 생각 시간에서 v1 을 67~73% 이겼다 (bench/ab-eval.js)
       evalVersion: 2,
     };
   }

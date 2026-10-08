@@ -498,8 +498,12 @@
   function miniPiece(p) {
     return `<svg class="mini" viewBox="-42 -42 84 84" aria-hidden="true">${pieceShape(p, 36)}</svg>`;
   }
-  function setupRow(side, setup) {
-    return J.SETUPS[setup].split('').map((t) => miniPiece(side + t)).join('');
+  // 상차림을 내 화면에서 보이는 순서(왼쪽 → 오른쪽)로 그린다.
+  // 상차림 이름은 자기 쪽에서 본 순서라, 맞은편(판 위쪽)에 앉은 상대는 좌우가 뒤집혀 보인다.
+  function setupRow(side, setup, facingMe) {
+    const letters = J.SETUPS[setup].split('');
+    if (facingMe) letters.reverse();
+    return letters.map((t) => miniPiece(side + t)).join('');
   }
 
   function showSetupDialog(keepTimer) {
@@ -516,7 +520,7 @@
       <div class="dlg-body">
         <div><h3>상차림 선택</h3><p>대국 시작시 상/마의 위치를 선택합니다. ${firstNote}</p></div>
         <div class="side-pick"><span class="label">내 진영</span>${sideBtn(J.CHO)}${sideBtn(J.HAN)}</div>
-        <div class="setup-opp"><span class="label">${oppLabel}</span><span>${setupRow(g.aiSide, g.aiSetup)}</span></div>
+        <div class="setup-opp"><span class="label">${oppLabel}</span><span>${setupRow(g.aiSide, g.aiSetup, true)}</span></div>
         <div class="setup-grid">${opts}</div>
       </div>
       <div class="dlg-foot"><button type="button" class="btn-main" data-act="start">확인</button></div>`, {

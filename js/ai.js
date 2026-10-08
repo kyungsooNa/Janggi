@@ -396,7 +396,8 @@
 
     // 약한 급수일수록 사람처럼 실수한다. 단, 지는 외통수를 그냥 내주거나
     // 이기는 외통수를 놓치지는 않게 한다.
-    if (exactRoot && scored.length > 1 && Math.abs(bestScore) < MATE / 2) {
+    // 장군을 받고 있을 때는 실수하지 않는다 (외통을 못 막는 일이 없게)
+    if (exactRoot && scored.length > 1 && Math.abs(bestScore) < MATE / 2 && !J.inCheck(boardIn, side)) {
       const candidates = scored.filter((o) => o.score > -MATE / 2);
       if (Math.random() < params.mistakeRate) {
         const pool = candidates.filter((o) => o.score >= bestScore - params.mistakeMargin);
