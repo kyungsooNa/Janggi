@@ -290,6 +290,12 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .setup-opp { display: flex; align-items: center; gap: 8px; padding-inline: 4px; }
 .setup-opp .label { font-size: 18px; font-weight: 900; color: #444; display: grid; gap: 2px; margin-right: auto; white-space: nowrap; }
 .setup-opp .label small { font-size: 12px; font-weight: 700; color: var(--card-sub); }
+.setup-opt .pieces { display: flex; justify-content: center; gap: 2px; }
+.setup-name { font-size: 14px; font-weight: 900; color: #555; letter-spacing: 0.08em; }
+.setup-opt[aria-pressed="true"] .setup-name { color: #e5772a; }
+.setup-opp .label .setup-name { font-size: 15px; }
+.setup-name.han { color: var(--han); }
+.setup-name.cho { color: var(--cho); }
 .opp-pick { display: flex; gap: 2px; padding: 6px; border: 0; border-radius: 8px; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); cursor: pointer; }
 .opp-pick:hover { box-shadow: inset 0 0 0 2px #b9b9bd; }
 .opp-pick .mini { width: clamp(28px, 8vw, 38px); }
@@ -298,7 +304,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .opp-hint { margin-top: -8px !important; font-size: 12.5px !important; text-align: right; }
 .setup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .setup-opt {
-  display: flex; justify-content: center; gap: 2px;
+  display: grid; justify-items: center; gap: 4px;
   padding: 10px 6px;
   background: #fff;
   border: 0; border-radius: 6px;

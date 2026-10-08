@@ -533,10 +533,17 @@
   }
   // 상차림을 내 화면에서 보이는 순서(왼쪽 → 오른쪽)로 그린다.
   // 상차림 이름은 자기 쪽에서 본 순서라, 맞은편(판 위쪽)에 앉은 상대는 좌우가 뒤집혀 보인다.
-  function setupRow(side, setup, facingMe) {
+  function setupLetters(setup, facingMe) {
     const letters = J.SETUPS[setup].split('');
     if (facingMe) letters.reverse();
-    return letters.map((t) => miniPiece(side + t)).join('');
+    return letters;
+  }
+  function setupRow(side, setup, facingMe) {
+    return setupLetters(setup, facingMe).map((t) => miniPiece(side + t)).join('');
+  }
+  // 화면에 보이는 순서대로 읽은 이름 (예: 마상상마)
+  function setupName(setup, facingMe) {
+    return setupLetters(setup, facingMe).map((t) => (t === 'H' ? '마' : '상')).join('');
   }
 
   function showSetupDialog(keepTimer) {
@@ -545,7 +552,8 @@
     const oppLabel = g.aiSide === J.HAN ? '한 상차림' : '초 상차림';
     const opts = SETUP_NAMES.map((name) => `
       <button type="button" class="setup-opt" data-act="pick" data-setup="${name}" aria-pressed="${name === g.mySetup}" aria-label="${name}">
-        ${setupRow(g.mySide, name)}
+        <span class="pieces">${setupRow(g.mySide, name)}</span>
+        <span class="setup-name">${setupName(name)}</span>
       </button>`).join('');
     const firstNote = g.mySide === J.CHO ? '초(楚)는 먼저 둡니다.' : '한(漢)은 덤 1.5점을 받고 나중에 둡니다.';
     openDialog(`
@@ -554,7 +562,7 @@
         <div><h3>상차림 선택</h3><p>대국 시작시 상/마의 위치를 선택합니다. ${firstNote}</p></div>
         <div class="side-pick"><span class="label">내 진영</span>${sideBtn(J.CHO)}${sideBtn(J.HAN)}</div>
         <div class="setup-opp">
-          <span class="label">${oppLabel}<small>${g.aiSetupPicked ? '직접 고름' : '무작위'}</small></span>
+          <span class="label">${oppLabel}<b class="setup-name ${g.aiSide === J.CHO ? 'cho' : 'han'}">${setupName(g.aiSetup, true)}</b><small>${g.aiSetupPicked ? '직접 고름' : '무작위'}</small></span>
           <button type="button" class="opp-pick" data-act="opp-next" aria-label="상대 상차림 바꾸기 (지금 ${g.aiSetup})">${setupRow(g.aiSide, g.aiSetup, true)}</button>
           <button type="button" class="opp-random" data-act="opp-random" aria-label="상대 상차림 무작위">무작위</button>
         </div>
