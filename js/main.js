@@ -274,16 +274,15 @@
     const prev = h[h.length - 2];
     return {
       bothPassed: !!(last && prev && last.pass && prev.pass),
+      lastPassBy: last && last.pass ? last.side : null,
       lastActive: !!(last && !last.pass && (last.captured || check)),
       // 양쪽 모두 약한 기물만 남았을 때만 AI 로 외통 여부를 확인한다 (그 전에는 기물 수만 세고 끝)
       noMate: window.JanggiAI.noMatePossible(g.board),
     };
   }
 
-  // 상대가 방금 쉬었고, 한쪽이 10점 이하라 나도 쉬면 기물승이 나는 상황에서 AI가 이기는 쪽이면 쉬어서 승부를 낸다
+  // 한쪽이 10점 이하이고 AI가 점수에서 앞서면, AI는 한수 쉼으로 바로 기물승을 가져간다
   function aiShouldClaimByPass() {
-    const last = g.history[g.history.length - 1];
-    if (!last || !last.pass) return false;
     if (!J.belowMinScore(g.board, J.CHO) && !J.belowMinScore(g.board, J.HAN)) return false;
     if (J.inCheck(g.board, g.aiSide) || J.passRepeats(g.board, g.aiSide, g.positions)) return false;
     return J.scoreLeader(g.board) === g.aiSide;

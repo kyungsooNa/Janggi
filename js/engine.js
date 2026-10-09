@@ -397,11 +397,12 @@
    * 대국이 끝났는지 판정한다 (카카오장기 방식). 끝나지 않았으면 null.
    *   side  : 이제 둘 차례인 쪽,  legal : 그 쪽의 합법수,  plies : 지금까지 둔 수 (한수 쉼 포함)
    *   ctx.bothPassed : 마지막 두 수가 양쪽의 연속 한수 쉼인가
+   *   ctx.lastPassBy : 마지막 수가 한수 쉼이면 쉰 쪽 ('c' / 'h')
    *   ctx.lastActive : 마지막 수가 기물을 잡았거나 장군을 불렀는가
    *   ctx.noMate     : 양쪽 모두 외통을 만들 수 없는 기물만 남았는가 (weakAttack + AI 확인)
    * 1) 외통
    * 2) 기물승: 서로 외통을 낼 수 없는 기물만 남았거나,
-   *    한쪽 점수가 10점 이하인데 양쪽이 연속으로 한수 쉼 → 점수 높은 쪽 승
+   *    한쪽 점수가 10점 이하인데 양쪽이 연속으로 한수 쉼, 또는 점수가 앞선 쪽이 한수 쉼 → 점수 높은 쪽 승
    * 3) 수 한도(200수): 점수 높은 쪽 승. 단 마지막 수가 잡기·장군이면 계속 두고,
    *    한도를 100수 넘기면 무조건 판정한다.
    */
@@ -409,8 +410,10 @@
     const c = ctx || {};
     if (legal.length === 0 && inCheck(board, side)) return { winner: opponent(side), reason: '외통' };
     if (c.noMate) return { winner: scoreLeader(board), reason: '기물' };
-    if (c.bothPassed && (belowMinScore(board, CHO) || belowMinScore(board, HAN))) {
-      return { winner: scoreLeader(board), reason: '기물' };
+    // 한쪽이 10점 이하일 때: 양쪽이 연속으로 쉬었거나, 점수가 앞선 쪽이 쉬면 앞선 쪽의 기물승
+    if (belowMinScore(board, CHO) || belowMinScore(board, HAN)) {
+      const leader = scoreLeader(board);
+      if (c.bothPassed || c.lastPassBy === leader) return { winner: leader, reason: '기물' };
     }
     if (plies >= moveLimit && (!c.lastActive || plies >= moveLimit + MOVE_HARD_LIMIT_EXTRA)) {
       return { winner: scoreLeader(board), reason: `${moveLimit}수 기물` };

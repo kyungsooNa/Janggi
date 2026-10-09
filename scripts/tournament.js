@@ -34,6 +34,7 @@ function playGame({ choParams, hanParams, choSetup, hanSetup, randomPlies = 0 })
     const legal = J.legalMoves(board, turn);
     const ctx = {
       bothPassed: passes >= 2,
+      lastPassBy: passes > 0 ? J.opponent(turn) : null,
       lastActive: lastCapture || J.inCheck(board, turn),
       noMate: AI.noMatePossible(board),
     };
@@ -44,7 +45,10 @@ function playGame({ choParams, hanParams, choSetup, hanSetup, randomPlies = 0 })
     const forbidden = J.repetitionForbidden(board, turn, legal, counts);
     const params = turn === J.CHO ? choParams : hanParams;
     let res;
-    if (!legal.length) res = { move: null };
+    // 화면과 같이: 한쪽이 10점 이하이고 둘 차례인 쪽이 앞서면 한수 쉼으로 기물승을 가져간다
+    const claim = (J.belowMinScore(board, J.CHO) || J.belowMinScore(board, J.HAN)) && J.scoreLeader(board) === turn
+      && !J.inCheck(board, turn) && !J.passRepeats(board, turn, counts);
+    if (!legal.length || claim) res = { move: null };
     else if (plies < randomPlies) res = { move: legal[Math.floor(Math.random() * legal.length)] };
     else res = AI.findBestMove(board, turn, { ...params, forbidden });
     if (res.move !== null) {

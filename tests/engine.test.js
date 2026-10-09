@@ -205,12 +205,15 @@ test('기물 판정 기준: 남은 기물 점수 10점 이하를 가린다', () 
   assert.ok(J.belowMinScore(ten, 'c'));
 });
 
-test('기물승(카장 방식): 10점 이하만으로는 끝나지 않고, 양쪽이 연속으로 쉬면 점수 높은 쪽이 이긴다', () => {
+test('기물승: 10점 이하만으로는 끝나지 않고, 양쪽이 연속으로 쉬거나 앞선 쪽이 쉬면 점수 높은 쪽이 이긴다', () => {
   // 한: 궁 + 포(7) + 덤 1.5 = 8.5점, 초: 궁 + 차(13) = 13점
   const b = boardWith([['cR', 0, 9], ['hC', 0, 2]]);
   const legal = J.legalMoves(b, 'h');
   assert.equal(J.gameOutcome(b, 'h', legal, 50, 200, { bothPassed: false }), null);
   assert.deepEqual(J.gameOutcome(b, 'h', legal, 50, 200, { bothPassed: true }), { winner: 'c', reason: '기물' });
+  // 앞선 쪽(초)이 쉬면 상대가 받아 쉬지 않아도 바로 기물승, 뒤진 쪽(한)이 쉬는 건 해당 없음
+  assert.deepEqual(J.gameOutcome(b, 'h', legal, 50, 200, { lastPassBy: 'c' }), { winner: 'c', reason: '기물' });
+  assert.equal(J.gameOutcome(b, 'c', J.legalMoves(b, 'c'), 50, 200, { lastPassBy: 'h' }), null);
   // 둘 다 10점을 넘으면 연속으로 쉬어도 계속 둔다
   const start = J.initialBoard('마상마상', '마상마상');
   assert.equal(J.gameOutcome(start, 'c', J.legalMoves(start, 'c'), 2, 200, { bothPassed: true }), null);
